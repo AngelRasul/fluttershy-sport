@@ -319,14 +319,21 @@ export default function App() {
 
   const { misses, completedWeeks, missedLastWorkout, mockingMessage } = useMemo(() => {
       let missesCount = 0;
-      let currentD = new Date(stats.installDate + "T00:00:00");
-      const todayD = new Date(currentDateStr + "T00:00:00");
+      
+      const parseDateSafe = (dStr: string) => {
+        const [y, m, d] = dStr.split('-');
+        return new Date(Number(y), Number(m) - 1, Number(d));
+      };
+
+      let currentD = parseDateSafe(stats.installDate);
+      const todayD = parseDateSafe(currentDateStr);
       
       while (currentD < todayD) {
           const dStr = getLocalDateString(currentD);
+          const legacyDStr = `${currentD.getFullYear()}-${currentD.getMonth() + 1}-${currentD.getDate()}`;
           const day = currentD.getDay();
           if ([1, 3, 5].includes(day)) {
-              if (!stats.completedDates.includes(dStr)) {
+              if (!stats.completedDates.includes(dStr) && !stats.completedDates.includes(legacyDStr)) {
                   missesCount++;
               }
           }
@@ -334,14 +341,15 @@ export default function App() {
       }
 
       let missedLast = false;
-      let lastD = new Date(currentDateStr + "T00:00:00");
+      let lastD = parseDateSafe(currentDateStr);
       lastD.setDate(lastD.getDate() - 1);
-      const installD = new Date(stats.installDate + "T00:00:00");
+      const installD = parseDateSafe(stats.installDate);
       
       while (lastD >= installD) {
           if ([1, 3, 5].includes(lastD.getDay())) {
               const dStr = getLocalDateString(lastD);
-              if (!stats.completedDates.includes(dStr)) {
+              const legacyDStr = `${lastD.getFullYear()}-${lastD.getMonth() + 1}-${lastD.getDate()}`;
+              if (!stats.completedDates.includes(dStr) && !stats.completedDates.includes(legacyDStr)) {
                   missedLast = true;
               }
               break;
@@ -351,7 +359,7 @@ export default function App() {
 
       const weeksMap: Record<string, number> = {};
       stats.completedDates.forEach((dStr: string) => {
-         const d = new Date(dStr + "T00:00:00");
+         const d = parseDateSafe(dStr);
          const day = d.getDay() || 7;
          d.setDate(d.getDate() - day + 1);
          const weekId = getLocalDateString(d);
