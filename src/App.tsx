@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Check, Timer, Flower2, Settings2, Square, X, Volume2, ArrowLeft, Play } from 'lucide-react';
+import { Check, Timer, Flower2, Square, X, Volume2, ArrowLeft, Play } from 'lucide-react';
 
 // --- Types & Data ---
+
+const parseDateSafe = (dStr: string) => {
+  const [y, m, d] = dStr.split('-');
+  return new Date(Number(y), Number(m) - 1, Number(d));
+};
 
 type Exercise = {
   id: string;
@@ -102,15 +107,24 @@ export default function App() {
   };
 
   const [currentDateStr] = useState(getLocalDateString());
-  const realDayOfWeek = new Date().getDay();
-  const [simulatedDay, setSimulatedDay] = useState<number | null>(null);
-  
-  const activeDay = simulatedDay !== null ? simulatedDay : realDayOfWeek;
+  const activeDay = parseDateSafe(currentDateStr).getDay();
   const isWorkoutDay = activeDay === 1 || activeDay === 3 || activeDay === 5;
   const workoutData = WORKOUTS[activeDay];
 
   // Exercises Progress (array of set IDs, e.g. "d1e1-0", "d1e1-1")
-  const [completedSets, setCompletedSets] = useState<string[]>([]);
+  const [completedSets, setCompletedSets] = useState<string[]>(() => {
+    const today = getLocalDateString();
+    const stored = localStorage.getItem('workout_progress_v2');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.date === today) {
+          return parsed.completedSets || [];
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
   
   // Workout Stats History
   const [stats, setStats] = useState(() => {
@@ -129,7 +143,6 @@ export default function App() {
   const [timerRemaining, setTimerRemaining] = useState<number | null>(null);
   const [timerDuration, setTimerDuration] = useState<number>(90); // default 90s
   const [timerActive, setTimerActive] = useState(false);
-  const [showDevMode, setShowDevMode] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -160,28 +173,6 @@ export default function App() {
       setStats(prev => ({ ...prev, totalTimeSeconds: (prev.totalTimeSeconds || 0) + delta }));
     };
   }, [view]);
-
-  // Load / Reset progress based on date
-  useEffect(() => {
-    const today = getLocalDateString();
-    const stored = localStorage.getItem('workout_progress_v2');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed.date === today) {
-          setCompletedSets(parsed.completedSets || []);
-        } else {
-          // New day, reset
-          setCompletedSets([]);
-          localStorage.setItem('workout_progress_v2', JSON.stringify({ date: today, completedSets: [] }));
-        }
-      } catch (e) {
-        console.error("Failed to parse progress", e);
-      }
-    } else {
-      localStorage.setItem('workout_progress_v2', JSON.stringify({ date: today, completedSets: [] }));
-    }
-  }, []);
 
   // Save progress on change
   useEffect(() => {
@@ -304,7 +295,7 @@ export default function App() {
   const isWorkoutDayFullyCompleted = workoutData && workoutData.exercises.length > 0 && completedExercisesCount === workoutData.exercises.length;
 
   useEffect(() => {
-    if (simulatedDay !== null || !isWorkoutDay) return;
+    if (!isWorkoutDay) return;
     setStats(prev => {
       const hasToday = prev.completedDates.includes(currentDateStr);
       if (isWorkoutDayFullyCompleted && !hasToday) {
@@ -315,15 +306,10 @@ export default function App() {
       }
       return prev;
     });
-  }, [simulatedDay, isWorkoutDay, isWorkoutDayFullyCompleted, currentDateStr]);
+  }, [isWorkoutDay, isWorkoutDayFullyCompleted, currentDateStr]);
 
-  const { misses, completedWeeks, missedLastWorkout, mockingMessage } = useMemo(() => {
+  const { misses, completedWeeks, missedLastWorkout, mockingMessage, currentWeekStatus } = useMemo(() => {
       let missesCount = 0;
-      
-      const parseDateSafe = (dStr: string) => {
-        const [y, m, d] = dStr.split('-');
-        return new Date(Number(y), Number(m) - 1, Number(d));
-      };
 
       let currentD = parseDateSafe(stats.installDate);
       const todayD = parseDateSafe(currentDateStr);
@@ -365,7 +351,7 @@ export default function App() {
          const weekId = getLocalDateString(d);
          weeksMap[weekId] = (weeksMap[weekId] || 0) + 1;
       });
-      const cWeeks = Object.values(weeksMap).filter(count => count >= 3).length;
+      const cWeeks = Object.values(weeksMap).filter(count => count === 3).length;
 
       let msg = "";
       if (missedLast) {
@@ -393,7 +379,22 @@ export default function App() {
           msg = list[Math.floor(seed) % list.length];
       }
 
-      return { misses: missesCount, completedWeeks: cWeeks, missedLastWorkout: missedLast, mockingMessage: msg };
+      const currentWeekDays = [1, 3, 5];
+      const currentWeekStatus = currentWeekDays.map(targetDay => {
+          const d = parseDateSafe(currentDateStr);
+          const currentDay = d.getDay() || 7;
+          d.setDate(d.getDate() - currentDay + targetDay);
+          const dStr = getLocalDateString(d);
+          const legacyDStr = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+          return {
+              label: targetDay === 1 ? 'Пн' : targetDay === 3 ? 'Ср' : 'Пт',
+              done: stats.completedDates.includes(dStr) || stats.completedDates.includes(legacyDStr),
+              isPast: todayD > d,
+              isToday: dStr === currentDateStr
+          };
+      });
+
+      return { misses: missesCount, completedWeeks: cWeeks, missedLastWorkout: missedLast, mockingMessage: msg, currentWeekStatus };
   }, [stats, currentDateStr]);
 
   // --- Render ---
@@ -437,6 +438,28 @@ export default function App() {
               </div>
             </div>
 
+            <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 flex flex-col">
+              <div className="flex justify-between items-end mb-3">
+                <div className="text-sm font-bold text-stone-800">Прогресс текущей недели</div>
+                <div className="text-xs font-semibold text-stone-400">
+                   {currentWeekStatus.filter(d => d.done).length} / 3
+                </div>
+              </div>
+              <div className="flex justify-between gap-2">
+                {currentWeekStatus.map((day, idx) => (
+                  <div key={idx} className={`flex-1 flex flex-col items-center justify-center p-2 rounded-2xl border-2 transition-all ${
+                      day.done ? 'bg-green-50 border-green-200 text-green-600' : 
+                      day.isToday ? 'bg-pink-50 border-pink-200 text-pink-600 shadow-sm' :
+                      day.isPast ? 'bg-red-50 border-red-100 text-red-400' :
+                      'bg-stone-50 border-stone-100 text-stone-400'
+                  }`}>
+                    <span className="text-[10px] font-bold uppercase mb-1 opacity-80 tracking-wider">{day.label}</span>
+                    {day.done ? <Check className="w-5 h-5" strokeWidth={3} /> : <div className="w-5 h-5 rounded-full border-2 border-current opacity-30" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 flex flex-col items-center justify-center text-center">
               <div className="text-4xl font-black text-stone-800 mb-1">{formatTotalWorkoutTime(stats.totalTimeSeconds || 0)}</div>
               <div className="text-[10px] font-bold text-stone-500 uppercase tracking-wider leading-tight">Общее время тренировок</div>
@@ -463,78 +486,41 @@ export default function App() {
                 <ArrowLeft className="w-5 h-5" />
               </button>
 
-              <button 
-            onClick={() => setShowDevMode(!showDevMode)}
-            className="absolute top-4 right-4 p-2 text-stone-400 hover:text-pink-400 transition-colors bg-white/50 rounded-full"
-            aria-label="Режим разработчика"
-          >
-            <Settings2 className="w-5 h-5" />
-          </button>
-
-          <div className="flex items-center gap-2 mb-2">
-            <Butterfly className="w-6 h-6" />
-            <h1 className="text-2xl font-bold text-stone-800 tracking-tight">Трекер Тренировок</h1>
-            <Butterfly className="w-6 h-6 -scale-x-100" />
-          </div>
-          
-          <p className="text-lg font-medium text-pink-500 mb-1">
-             {isWorkoutDay && workoutData ? `${workoutData.dayName} (${DAY_NAMES[activeDay]})` : DAY_NAMES[activeDay]}
-          </p>
-          
-          {isWorkoutDay && workoutData && (
-            <div className="flex flex-col items-center mt-3 w-full">
-              <span className="text-sm font-semibold uppercase tracking-wider text-stone-500 mb-2 bg-white/60 px-4 py-1 rounded-full shadow-sm">
-                {workoutData.focus}
-              </span>
-              
-              {/* Progress Bar */}
-              <div className="w-full max-w-[200px] mt-2">
-                <div className="flex justify-between text-xs font-bold text-stone-500 mb-1">
-                  <span>Прогресс</span>
-                  <span>{completedExercisesCount} / {workoutData.exercises.length}</span>
-                </div>
-                <div className="h-3 w-full bg-stone-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-pink-400 transition-all duration-500 ease-out rounded-full"
-                    style={{ width: `${(completedExercisesCount / workoutData.exercises.length) * 100}%` }}
-                  />
-                </div>
+              <div className="flex items-center gap-2 mb-2 mt-4">
+                <Butterfly className="w-6 h-6" />
+                <h1 className="text-2xl font-bold text-stone-800 tracking-tight">Трекер Тренировок</h1>
+                <Butterfly className="w-6 h-6 -scale-x-100" />
               </div>
-            </div>
-          )}
-        </header>
+              
+              <p className="text-lg font-medium text-pink-500 mb-1">
+                 {isWorkoutDay && workoutData ? `${workoutData.dayName} (${DAY_NAMES[activeDay]})` : DAY_NAMES[activeDay]}
+              </p>
+              
+              {isWorkoutDay && workoutData && (
+                <div className="flex flex-col items-center mt-3 w-full">
+                  <span className="text-sm font-semibold uppercase tracking-wider text-stone-500 mb-2 bg-white/60 px-4 py-1 rounded-full shadow-sm">
+                    {workoutData.focus}
+                  </span>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full max-w-[200px] mt-2">
+                    <div className="flex justify-between text-xs font-bold text-stone-500 mb-1">
+                      <span>Прогресс</span>
+                      <span>{completedExercisesCount} / {workoutData.exercises.length}</span>
+                    </div>
+                    <div className="h-3 w-full bg-stone-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-pink-400 transition-all duration-500 ease-out rounded-full"
+                        style={{ width: `${(completedExercisesCount / workoutData.exercises.length) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </header>
 
-        {/* Developer Mode Panel */}
-        {showDevMode && (
-          <div className="mx-4 mb-6 p-4 bg-white rounded-3xl shadow-md border border-pink-100 relative">
-            <button onClick={() => setShowDevMode(false)} className="absolute top-3 right-3 text-stone-400">
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="font-bold text-stone-800 mb-3 flex items-center gap-2">
-              <Settings2 className="w-4 h-4 text-pink-500" />
-              Режим Разработчика
-            </h2>
-            <div className="flex bg-stone-100 p-1 rounded-2xl w-full">
-              {[
-                { label: 'Реал', val: null },
-                { label: 'День 1', val: 1 },
-                { label: 'День 2', val: 3 },
-                { label: 'День 3', val: 5 }
-              ].map(opt => (
-                <button 
-                  key={opt.label}
-                  onClick={() => setSimulatedDay(opt.val)}
-                  className={`flex-1 py-2 text-sm font-bold rounded-xl transition-colors ${simulatedDay === opt.val ? 'bg-pink-500 text-white shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Main Content */}
-        <main className="px-4">
+            {/* Main Content */}
+            <main className="px-4">
           {!isWorkoutDay ? (
             // Rest Day View
             <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white/60 rounded-[3rem] shadow-sm border border-white">
