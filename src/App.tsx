@@ -399,7 +399,7 @@ export default function App() {
 
   // --- Render ---
   return (
-    <div className="min-h-screen bg-[#fefce8] text-stone-700 font-sans pb-32 selection:bg-pink-200 relative overflow-hidden">
+    <div className={`bg-[#fffdf7] text-stone-800 font-sans selection:bg-pink-200 relative w-full ${view === 'home' ? 'h-[100dvh] overflow-hidden flex flex-col' : 'min-h-screen overflow-x-hidden pb-32'}`}>
       
       {/* Background Decorations */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden opacity-40 z-0">
@@ -409,49 +409,49 @@ export default function App() {
         <Butterfly className="absolute bottom-40 left-8 w-8 h-8 -scale-x-100 rotate-45" />
       </div>
 
-      <div className="max-w-md mx-auto relative z-10">
+      <div className={`max-w-md mx-auto relative z-10 w-full ${view === 'home' ? 'flex-1 flex flex-col' : ''}`}>
         
         {view === 'home' ? (
-          <div className="px-6 py-8 space-y-6">
-            <header className="text-center mb-8 relative">
-              <Butterfly className="w-10 h-10 mx-auto mb-4 text-pink-400" />
-              <h1 className="text-3xl font-bold text-stone-800 tracking-tight">Твой Прогресс</h1>
+          <div className="px-5 py-4 flex flex-col justify-center h-full space-y-3">
+            <header className="text-center mb-2 relative mt-auto">
+              <Butterfly className="w-10 h-10 mx-auto mb-2 text-[#ec4899]" />
+              <h1 className="text-2xl font-bold text-stone-800 tracking-tight">Твой Прогресс</h1>
             </header>
 
             {missedLastWorkout && (
-              <div className="bg-red-50 border-2 border-red-200 p-5 rounded-3xl relative overflow-hidden shadow-sm">
-                <div className="font-bold text-red-700 mb-2 flex items-center gap-2">
+              <div className="bg-[#fee2e2] text-[#991b1b] p-4 rounded-[24px] relative overflow-hidden shadow-sm">
+                <div className="font-bold mb-1 flex items-center gap-2 text-sm">
                   Пропуск зафиксирован 🚨
                 </div>
-                <p className="text-red-600/90 text-sm font-medium leading-relaxed">{mockingMessage}</p>
+                <p className="text-[#991b1b]/90 text-xs font-medium leading-relaxed">{mockingMessage}</p>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-pink-100 flex flex-col items-center justify-center text-center">
-                <div className="text-5xl font-black text-pink-500 mb-2">{completedWeeks}</div>
-                <div className="text-[10px] font-bold text-stone-500 uppercase tracking-wider leading-tight">Идеальных<br/>недель</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#fbcfe8] p-4 rounded-[24px] shadow-sm flex flex-col items-center justify-center text-center">
+                <div className="text-4xl font-black text-[#831843] mb-1">{completedWeeks}</div>
+                <div className="text-[10px] font-bold text-[#831843] uppercase tracking-wider leading-tight">Идеальных<br/>недель</div>
               </div>
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col items-center justify-center text-center">
-                <div className="text-5xl font-black text-stone-700 mb-2">{misses}</div>
-                <div className="text-[10px] font-bold text-stone-500 uppercase tracking-wider leading-tight">Пропусков<br/>всего</div>
+              <div className="bg-[#fef08a] p-4 rounded-[24px] shadow-sm flex flex-col items-center justify-center text-center">
+                <div className="text-4xl font-black text-[#713f12] mb-1">{misses}</div>
+                <div className="text-[10px] font-bold text-[#713f12] uppercase tracking-wider leading-tight">Пропусков<br/>всего</div>
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 flex flex-col">
-              <div className="flex justify-between items-end mb-3">
-                <div className="text-sm font-bold text-stone-800">Прогресс текущей недели</div>
-                <div className="text-xs font-semibold text-stone-400">
+            <div className="bg-[#fef9c3] p-4 rounded-[24px] shadow-sm flex flex-col">
+              <div className="flex justify-between items-end mb-2">
+                <div className="text-sm font-bold text-[#713f12]">Прогресс текущей недели</div>
+                <div className="text-xs font-semibold text-[#713f12]/70">
                    {currentWeekStatus.filter(d => d.done).length} / 3
                 </div>
               </div>
               <div className="flex justify-between gap-2">
                 {currentWeekStatus.map((day, idx) => (
-                  <div key={idx} className={`flex-1 flex flex-col items-center justify-center p-2 rounded-2xl border-2 transition-all ${
-                      day.done ? 'bg-green-50 border-green-200 text-green-600' : 
-                      day.isToday ? 'bg-pink-50 border-pink-200 text-pink-600 shadow-sm' :
-                      day.isPast ? 'bg-red-50 border-red-100 text-red-400' :
-                      'bg-stone-50 border-stone-100 text-stone-400'
+                  <div key={idx} className={`flex-1 flex flex-col items-center justify-center p-2 rounded-2xl transition-all ${
+                      day.done ? 'bg-[#dcfce7] text-[#166534]' : 
+                      day.isToday ? 'bg-[#fbcfe8] text-[#831843] shadow-sm' :
+                      day.isPast ? 'bg-[#fee2e2] text-[#991b1b]' :
+                      'bg-[#fffdf7] text-[#713f12]/50'
                   }`}>
                     <span className="text-[10px] font-bold uppercase mb-1 opacity-80 tracking-wider">{day.label}</span>
                     {day.done ? <Check className="w-5 h-5" strokeWidth={3} /> : <div className="w-5 h-5 rounded-full border-2 border-current opacity-30" />}
@@ -460,15 +460,15 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 flex flex-col items-center justify-center text-center">
-              <div className="text-4xl font-black text-stone-800 mb-1">{formatTotalWorkoutTime(stats.totalTimeSeconds || 0)}</div>
-              <div className="text-[10px] font-bold text-stone-500 uppercase tracking-wider leading-tight">Общее время тренировок</div>
+            <div className="bg-[#fff8cd] p-4 rounded-[24px] shadow-sm flex flex-col items-center justify-center text-center">
+              <div className="text-3xl font-black text-[#713f12] mb-1">{formatTotalWorkoutTime(stats.totalTimeSeconds || 0)}</div>
+              <div className="text-[10px] font-bold text-[#713f12] uppercase tracking-wider leading-tight">Общее время тренировок</div>
             </div>
 
-            <div className="pt-4">
+            <div className="pt-1 mb-auto pb-2">
               <button 
                 onClick={() => setView('workout')} 
-                className="w-full bg-pink-500 text-white font-bold text-lg py-5 rounded-[2rem] shadow-lg shadow-pink-200 hover:bg-pink-600 transition-transform active:scale-95 flex items-center justify-center gap-3"
+                className="w-full bg-[#ec4899] text-white font-bold text-lg py-4 rounded-full shadow-md active:bg-[#db2777] transition-all active:scale-[0.98] flex items-center justify-center gap-3"
               >
                 {isWorkoutDay && !isWorkoutDayFullyCompleted ? <><Play fill="currentColor" className="w-5 h-5"/> Начать тренировку</> : 'Посмотреть расписание'}
               </button>
@@ -477,40 +477,40 @@ export default function App() {
         ) : (
           <>
             {/* Header */}
-            <header className="pt-8 pb-6 px-6 bg-[#fef9c3] rounded-b-[2.5rem] shadow-sm mb-6 flex flex-col items-center relative">
+            <header className="pt-8 pb-6 px-6 bg-[#fef9c3] rounded-b-[32px] shadow-sm mb-6 flex flex-col items-center relative">
               <button 
                 onClick={() => setView('home')}
-                className="absolute top-4 left-4 p-2 text-stone-500 hover:text-pink-500 transition-colors bg-white/50 rounded-full"
+                className="absolute top-4 left-4 p-2 text-[#713f12] hover:bg-white/50 transition-colors bg-white/30 rounded-full"
                 aria-label="Назад"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
 
               <div className="flex items-center gap-2 mb-2 mt-4">
-                <Butterfly className="w-6 h-6" />
-                <h1 className="text-2xl font-bold text-stone-800 tracking-tight">Трекер Тренировок</h1>
-                <Butterfly className="w-6 h-6 -scale-x-100" />
+                <Butterfly className="w-6 h-6 text-[#ec4899]" />
+                <h1 className="text-2xl font-bold text-[#713f12] tracking-tight">Трекер Тренировок</h1>
+                <Butterfly className="w-6 h-6 -scale-x-100 text-[#ec4899]" />
               </div>
               
-              <p className="text-lg font-medium text-pink-500 mb-1">
+              <p className="text-lg font-medium text-[#db2777] mb-1">
                  {isWorkoutDay && workoutData ? `${workoutData.dayName} (${DAY_NAMES[activeDay]})` : DAY_NAMES[activeDay]}
               </p>
               
               {isWorkoutDay && workoutData && (
                 <div className="flex flex-col items-center mt-3 w-full">
-                  <span className="text-sm font-semibold uppercase tracking-wider text-stone-500 mb-2 bg-white/60 px-4 py-1 rounded-full shadow-sm">
+                  <span className="text-sm font-semibold uppercase tracking-wider text-[#713f12] mb-2 bg-[#fef08a] px-4 py-1 rounded-full shadow-sm">
                     {workoutData.focus}
                   </span>
                   
                   {/* Progress Bar */}
                   <div className="w-full max-w-[200px] mt-2">
-                    <div className="flex justify-between text-xs font-bold text-stone-500 mb-1">
+                    <div className="flex justify-between text-xs font-bold text-[#713f12]/70 mb-1">
                       <span>Прогресс</span>
                       <span>{completedExercisesCount} / {workoutData.exercises.length}</span>
                     </div>
-                    <div className="h-3 w-full bg-stone-200 rounded-full overflow-hidden">
+                    <div className="h-3 w-full bg-[#fef08a] rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-pink-400 transition-all duration-500 ease-out rounded-full"
+                        className="h-full bg-[#ec4899] transition-all duration-500 ease-out rounded-full"
                         style={{ width: `${(completedExercisesCount / workoutData.exercises.length) * 100}%` }}
                       />
                     </div>
@@ -523,16 +523,16 @@ export default function App() {
             <main className="px-4">
           {!isWorkoutDay ? (
             // Rest Day View
-            <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white/60 rounded-[3rem] shadow-sm border border-white">
+            <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-[#fef9c3] rounded-[32px] shadow-sm">
               <div className="text-6xl mb-6 drop-shadow-sm">💤</div>
-              <h2 className="text-2xl font-bold text-stone-800 mb-3">Сегодня день отдыха</h2>
-              <p className="text-stone-500 text-lg">
+              <h2 className="text-2xl font-bold text-[#713f12] mb-3">Сегодня день отдыха</h2>
+              <p className="text-[#713f12]/80 text-lg">
                 Вашим мышцам нужно время на восстановление. Наслаждайтесь отдыхом!
               </p>
-              <div className="flex gap-4 mt-8 opacity-50">
-                <Flower2 className="w-8 h-8 text-pink-400" />
-                <Flower2 className="w-8 h-8 text-yellow-400" />
-                <Flower2 className="w-8 h-8 text-pink-400" />
+              <div className="flex gap-4 mt-8 opacity-70">
+                <Flower2 className="w-8 h-8 text-[#ec4899]" />
+                <Flower2 className="w-8 h-8 text-[#eab308]" />
+                <Flower2 className="w-8 h-8 text-[#ec4899]" />
               </div>
             </div>
           ) : (
@@ -544,10 +544,10 @@ export default function App() {
                 return (
                   <div 
                     key={exercise.id} 
-                    className={`p-5 rounded-3xl transition-all duration-300 border-2 shadow-sm relative overflow-hidden ${
+                    className={`p-5 rounded-[28px] transition-all duration-300 shadow-sm relative overflow-hidden border-2 ${
                       isExerciseDone 
-                        ? 'bg-green-50/80 border-green-200/50' 
-                        : 'bg-white border-transparent shadow-md'
+                        ? 'bg-[#dcfce7] border-[#dcfce7] text-[#166534]' 
+                        : 'bg-[#fffdf7] border-[#fef9c3]/50 shadow-md'
                     }`}
                   >
                     {isExerciseDone && (
@@ -556,9 +556,9 @@ export default function App() {
                     
                     <div className="relative z-10">
                       <h3 className={`text-lg font-bold leading-tight mb-2 transition-all ${
-                        isExerciseDone ? 'text-stone-400 line-through' : 'text-stone-800'
+                        isExerciseDone ? 'text-[#166534]/70 line-through' : 'text-stone-800'
                       }`}>
-                        <span className="text-pink-400 mr-1.5 opacity-80">{index + 1}.</span>
+                        <span className={`${isExerciseDone ? 'text-[#166534]/50' : 'text-[#db2777]'} mr-1.5 opacity-80`}>{index + 1}.</span>
                         {exercise.title}
                       </h3>
                       
@@ -566,15 +566,15 @@ export default function App() {
                         <ExerciseImages imageId={exercise.imageId} isDone={isExerciseDone} />
                       )}
                       
-                      <div className={`space-y-1.5 text-sm ${isExerciseDone ? 'text-stone-400' : 'text-stone-600'}`}>
-                        <div className="flex items-center gap-2 bg-stone-100/60 w-fit px-3 py-1 rounded-lg">
-                          <span className="font-semibold text-stone-700">{exercise.setsText}</span>
-                          <span className="text-stone-300">|</span>
-                          <span>{exercise.reps}</span>
+                      <div className={`space-y-1.5 text-sm ${isExerciseDone ? 'text-[#166534]/70' : 'text-stone-600'}`}>
+                        <div className={`flex items-center gap-2 w-fit px-3 py-1 rounded-xl ${isExerciseDone ? 'bg-[#bbf7d0]' : 'bg-[#fef9c3]'}`}>
+                          <span className={`font-semibold ${isExerciseDone ? 'text-[#166534]' : 'text-[#713f12]'}`}>{exercise.setsText}</span>
+                          <span className="opacity-40">|</span>
+                          <span className={isExerciseDone ? 'text-[#166534]' : 'text-[#713f12]'}>{exercise.reps}</span>
                         </div>
                         
                         {exercise.tempo && exercise.tempo !== '-' && (
-                          <div className="flex items-start gap-2 mt-2 text-stone-500 text-xs px-1">
+                          <div className={`flex items-start gap-2 mt-2 text-xs px-1 ${isExerciseDone ? 'text-[#166534]/70' : 'text-stone-500'}`}>
                             <Timer className="w-4 h-4 shrink-0 opacity-60" />
                             <span className="leading-snug">Темп: {exercise.tempo}</span>
                           </div>
@@ -589,10 +589,10 @@ export default function App() {
                             <button
                               key={i}
                               onClick={() => handleToggleSet(exercise.id, i, exercise.numSets)}
-                              className={`px-2 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all flex-1 min-w-[50px] border-2 ${
+                              className={`px-2 py-2 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all flex-1 min-w-[50px] border-2 ${
                                 isSetDone
-                                  ? 'bg-green-400 border-green-400 text-white shadow-inner'
-                                  : 'bg-stone-50 border-stone-200 text-stone-400 hover:border-pink-300'
+                                  ? 'bg-[#166534] border-[#166534] text-white shadow-md'
+                                  : 'bg-[#fef9c3] border-[#fef9c3] text-[#713f12] hover:border-[#fde047]'
                               }`}
                             >
                               <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Подход</span>
@@ -618,23 +618,23 @@ export default function App() {
       {/* Floating Timer UI */}
       {timerActive && (
         <div className="fixed bottom-6 left-0 right-0 px-4 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 flex justify-center">
-          <div className="bg-white max-w-sm w-full p-4 rounded-[2rem] shadow-xl border border-pink-100 flex flex-col gap-3">
+          <div className="bg-[#fff8cd] max-w-sm w-full p-4 rounded-[32px] shadow-xl flex flex-col gap-3">
             <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-2 text-stone-600 font-medium">
-                <Timer className="w-5 h-5 text-pink-500" />
+              <div className="flex items-center gap-2 text-[#713f12] font-medium">
+                <Timer className="w-5 h-5 text-[#db2777]" />
                 Таймер отдыха
               </div>
               <button 
                 onClick={stopTimer}
-                className="text-stone-400 hover:text-stone-600 p-1"
+                className="text-[#713f12]/50 hover:text-[#713f12] p-1 bg-white/30 rounded-full"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="text-center font-mono text-5xl font-bold tracking-tight text-stone-800 my-1 flex justify-center items-center gap-2">
+            <div className="text-center font-mono text-5xl font-bold tracking-tight text-[#713f12] my-1 flex justify-center items-center gap-2">
               {formatTime(timerRemaining)}
-              {timerRemaining === 0 && <Volume2 className="w-8 h-8 text-pink-500 animate-pulse" />}
+              {timerRemaining === 0 && <Volume2 className="w-8 h-8 text-[#db2777] animate-pulse" />}
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -642,10 +642,10 @@ export default function App() {
                 <button
                   key={t}
                   onClick={() => startTimer(t)}
-                  className={`py-2 rounded-xl text-sm font-bold transition-colors ${
+                  className={`py-2 rounded-2xl text-sm font-bold transition-colors ${
                     timerDuration === t 
-                      ? 'bg-pink-100 text-pink-600' 
-                      : 'bg-stone-50 text-stone-500 hover:bg-stone-100'
+                      ? 'bg-[#ec4899] text-white shadow-md' 
+                      : 'bg-white/50 text-[#713f12] hover:bg-white/80'
                   }`}
                 >
                   {t} сек
@@ -656,16 +656,16 @@ export default function App() {
             {timerRemaining === 0 ? (
               <button
                 onClick={stopTimer}
-                className="w-full py-3 bg-pink-500 text-white rounded-2xl font-bold mt-1 hover:bg-pink-600 transition-colors shadow-md shadow-pink-200"
+                className="w-full py-4 bg-[#ec4899] text-white rounded-full font-bold mt-1 hover:bg-[#db2777] transition-all shadow-md active:scale-95"
               >
                 Завершить отдых
               </button>
             ) : (
               <button
                 onClick={stopTimer}
-                className="w-full py-3 bg-stone-100 text-stone-600 rounded-2xl font-bold mt-1 hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-4 bg-white/50 text-[#713f12] rounded-full font-bold mt-1 hover:bg-white/80 transition-all flex items-center justify-center gap-2"
               >
-                <Square className="w-4 h-4" />
+                <Square className="w-4 h-4 fill-current" />
                 Остановить
               </button>
             )}
