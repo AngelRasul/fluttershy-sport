@@ -1,93 +1,81 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Check, Timer, Flower2, Square, X, Volume2, ArrowLeft, Play } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Check, Timer, Flower2, X, Volume2, Play, LayoutDashboard, Dumbbell } from 'lucide-react';
 
-// --- Types & Data ---
-
+// --- Utils & Constants ---
 const parseDateSafe = (dStr: string) => {
   const [y, m, d] = dStr.split('-');
   return new Date(Number(y), Number(m) - 1, Number(d));
 };
 
-type Exercise = {
-  id: string;
-  title: string;
-  setsText: string;
-  numSets: number;
-  reps: string;
-  tempo?: string;
-  imageId: string;
+const getLocalDateString = (d: Date = new Date()) => {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-type WorkoutDay = {
-  dayName: string;
-  focus: string;
-  exercises: Exercise[];
+const formatTime = (seconds: number | null) => {
+  if (seconds === null) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 };
+
+const formatTotalWorkoutTime = (totalSeconds: number) => {
+  if (!totalSeconds) return "0 мин";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  if (h > 0) return `${h} ч ${m} м`;
+  return `${m} мин`;
+};
+
+type Exercise = { id: string; title: string; setsText: string; numSets: number; reps: string; tempo?: string; imageId: string; };
+type WorkoutDay = { dayName: string; focus: string; exercises: Exercise[]; };
 
 const WORKOUTS: Record<number, WorkoutDay> = {
-  1: { // Monday
-    dayName: 'День 1',
-    focus: 'Ноги и тяги',
-    exercises: [
-      { id: 'd1e1', title: 'Болгарские сплит-приседания (с гантелями)', setsText: '4 подхода', numSets: 4, reps: '10–15 на каждую ногу', tempo: '3 сек вниз, пауза 1 сек, подъем', imageId: 'Split_Squat_with_Dumbbells' },
-      { id: 'd1e2', title: 'Румынская тяга на одной ноге', setsText: '3 подхода', numSets: 3, reps: '12–15 повторений', tempo: '3 сек вниз, подъем', imageId: 'Kettlebell_One-Legged_Deadlift' },
-      { id: 'd1e3', title: 'Тяга штанги в наклоне к поясу', setsText: '4 подхода', numSets: 4, reps: '15–20 (до отказа)', tempo: '3 сек опускание, пауза вверху', imageId: 'Bent_Over_Barbell_Row' },
-      { id: 'd1e4', title: 'Сгибания рук со штангой на бицепс', setsText: '3 подхода', numSets: 3, reps: '12–15 повторений', imageId: 'Barbell_Curl' },
-    ]
-  },
-  3: { // Wednesday
-    dayName: 'День 2',
-    focus: 'Жимы и плечи',
-    exercises: [
-      { id: 'd2e1', title: 'Жим гантелей лежа на полу (Floor Press)', setsText: '4 подхода', numSets: 4, reps: '15–20 повторений', tempo: '3 сек вниз, касание локтями пола, жим вверх', imageId: 'Dumbbell_Floor_Press' },
-      { id: 'd2e2', title: 'Отжимания от пола', setsText: '4 подхода', numSets: 4, reps: 'До отказа (с весом если легко)', imageId: 'Pushups' },
-      { id: 'd2e3', title: 'Армейский жим штанги стоя', setsText: '3 подхода', numSets: 3, reps: '12–15 повторений', tempo: '3 сек вниз, пауза у груди', imageId: 'Standing_Military_Press' },
-      { id: 'd2e4', title: 'Махи гантелями в стороны', setsText: '3 подхода', numSets: 3, reps: '15–20 повторений', imageId: 'Side_Lateral_Raise' },
-    ]
-  },
-  5: { // Friday
-    dayName: 'День 3',
-    focus: 'Всё тело + кор',
-    exercises: [
-      { id: 'd3e1', title: 'Приседания со штангой на груди (Фронтальные)', setsText: '4 подхода', numSets: 4, reps: '15–20 повторений', tempo: '4 сек вниз, пауза 2 сек внизу', imageId: 'Front_Barbell_Squat' },
-      { id: 'd3e2', title: 'Тяга гантели одной рукой в упоре', setsText: '4 подхода', numSets: 4, reps: '12–15 на каждую руку', imageId: 'One-Arm_Dumbbell_Row' },
-      { id: 'd3e3', title: 'Французский жим с гантелями лежа', setsText: '3 подхода', numSets: 3, reps: '12–15 повторений', imageId: 'Lying_Dumbbell_Tricep_Extension' },
-      { id: 'd3e4', title: 'Подъемы ног или скручивания на пресс', setsText: '3 подхода', numSets: 3, reps: 'До отказа', imageId: 'Crunches' },
-    ]
-  }
+  1: { dayName: 'День 1', focus: 'Ноги и тяги', exercises: [
+    { id: 'd1e1', title: 'Болгарские сплит-приседания (с гантелями)', setsText: '4 подхода', numSets: 4, reps: '10–15 на ногу', tempo: '3 сек вниз, пауза 1 сек, подъем', imageId: 'Split_Squat_with_Dumbbells' },
+    { id: 'd1e2', title: 'Румынская тяга на одной ноге', setsText: '3 подхода', numSets: 3, reps: '12–15 повторений', tempo: '3 сек вниз, подъем', imageId: 'Kettlebell_One-Legged_Deadlift' },
+    { id: 'd1e3', title: 'Тяга штанги в наклоне к поясу', setsText: '4 подхода', numSets: 4, reps: '15–20 (до отказа)', tempo: '3 сек опускание, пауза вверху', imageId: 'Bent_Over_Barbell_Row' },
+    { id: 'd1e4', title: 'Сгибания рук со штангой на бицепс', setsText: '3 подхода', numSets: 3, reps: '12–15 повторений', imageId: 'Barbell_Curl' },
+  ]},
+  3: { dayName: 'День 2', focus: 'Жимы и плечи', exercises: [
+    { id: 'd2e1', title: 'Жим гантелей лежа на полу (Floor Press)', setsText: '4 подхода', numSets: 4, reps: '15–20 повторений', tempo: '3 сек вниз, касание пола, жим вверх', imageId: 'Dumbbell_Floor_Press' },
+    { id: 'd2e2', title: 'Отжимания от пола', setsText: '4 подхода', numSets: 4, reps: 'До отказа', imageId: 'Pushups' },
+    { id: 'd2e3', title: 'Армейский жим штанги стоя', setsText: '3 подхода', numSets: 3, reps: '12–15 повторений', tempo: '3 сек вниз, пауза у груди', imageId: 'Standing_Military_Press' },
+    { id: 'd2e4', title: 'Махи гантелями в стороны', setsText: '3 подхода', numSets: 3, reps: '15–20 повторений', imageId: 'Side_Lateral_Raise' },
+  ]},
+  5: { dayName: 'День 3', focus: 'Всё тело + кор', exercises: [
+    { id: 'd3e1', title: 'Приседания со штангой на груди (Фронтальные)', setsText: '4 подхода', numSets: 4, reps: '15–20 повторений', tempo: '4 сек вниз, пауза 2 сек внизу', imageId: 'Front_Barbell_Squat' },
+    { id: 'd3e2', title: 'Тяга гантели одной рукой в упоре', setsText: '4 подхода', numSets: 4, reps: '12–15 на каждую руку', imageId: 'One-Arm_Dumbbell_Row' },
+    { id: 'd3e3', title: 'Французский жим с гантелями лежа', setsText: '3 подхода', numSets: 3, reps: '12–15 повторений', imageId: 'Lying_Dumbbell_Tricep_Extension' },
+    { id: 'd3e4', title: 'Подъемы ног или скручивания на пресс', setsText: '3 подхода', numSets: 3, reps: 'До отказа', imageId: 'Crunches' },
+  ]}
 };
 
 const DAY_NAMES = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
-// --- Helper Components ---
+const FLUTTERSHY_QUOTES = [
+  "Эмм... ты сегодня так сильно постарался! Я тобой очень-очень горжусь, ты большой молодец! Отдохни немного, ладно? 🌸✨",
+  "Ой, ты уже закончил? Ты справляешься просто замечательно! 🦋",
+  "Эмм... если ты не против, я хотела сказать, что ты сегодня проявил настоящую силу! 🌸",
+  "Ух ты, тренировка окончена! Ты такой молодец, обязательно похвали себя сегодня! 💛"
+];
 
+// --- Helper Components ---
 const ExerciseImages = ({ imageId, isDone }: { imageId: string, isDone: boolean }) => {
   const baseUrl = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
   return (
-    <div className={`flex gap-2 w-full mt-3 mb-4 transition-all duration-500 ${isDone ? 'opacity-40 grayscale' : ''}`}>
-      <div className="flex-1 rounded-2xl overflow-hidden bg-white border-2 border-stone-100 shadow-sm aspect-square relative flex items-center justify-center p-2">
-        <img 
-          src={`${baseUrl}${imageId}/0.jpg`} 
-          className="w-full h-full object-contain mix-blend-multiply" 
-          alt="Start position" 
-          loading="lazy"
-        />
-      </div>
-      <div className="flex-1 rounded-2xl overflow-hidden bg-white border-2 border-stone-100 shadow-sm aspect-square relative flex items-center justify-center p-2">
-        <img 
-          src={`${baseUrl}${imageId}/1.jpg`} 
-          className="w-full h-full object-contain mix-blend-multiply" 
-          alt="End position" 
-          loading="lazy"
-        />
-      </div>
+    <div className={`flex gap-2 w-[calc(100%+24px)] -mx-3 mt-4 mb-5 transition-all duration-500 ${isDone ? 'opacity-40 grayscale' : ''}`}>
+      {[0, 1].map((idx) => (
+        <div key={idx} className="flex-1 rounded-[20px] overflow-hidden bg-white border border-[#fef08a]/80 shadow-md aspect-square relative flex items-center justify-center">
+          <img src={`${baseUrl}${imageId}/${idx}.jpg`} className="w-full h-full object-contain mix-blend-multiply scale-[1.1]" alt="position" loading="lazy" />
+        </div>
+      ))}
     </div>
   );
 };
 
 const Butterfly = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2C11.5 3 11 4 11 5C11 6.5 11.5 7.5 12 9C12.5 7.5 13 6.5 13 5C13 4 12.5 3 12 2Z" fill="#ec4899" opacity="0.8"/>
+    <path d="M12 2C11.5 3 11 4 11 5C11 6.5 11.5 7.5 12 9C12.5 7.5 13 6.5 13 5C13 4 12.5 3 12 2Z" fill="#db2777" opacity="0.8"/>
     <path d="M11.5 6.5C8 4 4 4 2 6C3.5 8 7 9 10 9.5C10.5 8.5 11 7.5 11.5 6.5Z" fill="#f472b6" opacity="0.9"/>
     <path d="M12.5 6.5C16 4 20 4 22 6C20.5 8 17 9 14 9.5C13.5 8.5 13 7.5 12.5 6.5Z" fill="#f472b6" opacity="0.9"/>
     <path d="M10.5 10.5C7 11 3.5 13 3 16C5.5 16.5 9 14.5 11.5 12C11 11.5 10.5 11 10.5 10.5Z" fill="#fbcfe8" opacity="0.9"/>
@@ -95,222 +83,266 @@ const Butterfly = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const BackgroundDecorations = () => (
+  <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <style>{`
+      @keyframes flapWings {
+        0%, 100% { transform: scaleX(1) rotateZ(0deg); }
+        50% { transform: scaleX(0.2) rotateZ(3deg); }
+      }
+      @keyframes bobbing {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-30px); }
+      }
+      @keyframes flyPath1 {
+        0% { left: -20%; top: 80%; }
+        100% { left: 120%; top: 20%; }
+      }
+      @keyframes flyPath2 {
+        0% { left: 120%; top: 50%; transform: scaleX(-1); }
+        100% { left: -20%; top: 10%; transform: scaleX(-1); }
+      }
+      @keyframes flyPath3 {
+        0% { left: -20%; top: 30%; }
+        100% { left: 120%; top: 60%; }
+      }
+      .butterfly-wrapper { position: absolute; }
+      .butterfly-bob { animation: bobbing 3s ease-in-out infinite; }
+      .butterfly-flap { animation: flapWings 0.25s infinite alternate ease-in-out; transform-origin: center; }
+    `}</style>
+    
+    <Flower2 className="absolute top-10 -left-6 w-32 h-32 text-[#fbcfe8]/30 -rotate-12" strokeWidth={1} />
+    <Flower2 className="absolute bottom-40 -right-10 w-48 h-48 text-[#fef08a]/30 rotate-45" strokeWidth={1} />
+    <Flower2 className="absolute top-1/2 left-1/4 w-20 h-20 text-[#fbcfe8]/20 rotate-90" strokeWidth={1} />
+
+    <div className="butterfly-wrapper" style={{ animation: 'flyPath1 16s linear infinite' }}>
+      <div className="butterfly-bob" style={{ animationDelay: '0s' }}>
+        <Butterfly className="butterfly-flap w-10 h-10 text-[#f472b6] drop-shadow-sm" />
+      </div>
+    </div>
+    
+    <div className="butterfly-wrapper" style={{ animation: 'flyPath2 24s linear infinite', animationDelay: '-5s' }}>
+      <div className="butterfly-bob" style={{ animationDelay: '1s' }}>
+        <Butterfly className="butterfly-flap w-12 h-12 text-[#fef08a] drop-shadow-sm" />
+      </div>
+    </div>
+
+    <div className="butterfly-wrapper" style={{ animation: 'flyPath3 19s linear infinite', animationDelay: '-10s' }}>
+      <div className="butterfly-bob" style={{ animationDelay: '2s' }}>
+        <Butterfly className="butterfly-flap w-8 h-8 text-[#db2777] drop-shadow-sm opacity-80" />
+      </div>
+    </div>
+  </div>
+);
+
+const ButterflyConfetti = () => (
+  <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+    <style>{`
+      @keyframes flyUpFade {
+        0% { transform: translateY(100vh) scale(0.5) rotate(0deg); opacity: 0; }
+        10% { opacity: 1; }
+        100% { transform: translateY(-20vh) scale(1.2) rotate(360deg); opacity: 0; }
+      }
+    `}</style>
+    {Array.from({ length: 15 }).map((_, i) => (
+      <div key={i} className="absolute" style={{
+        left: `${(i * 7) % 100}%`,
+        animation: `flyUpFade ${3 + (i % 3)}s ease-out forwards`,
+        animationDelay: `${(i % 5) * 0.3}s`,
+      }}>
+        <Butterfly className={`w-8 h-8 ${i % 2 === 0 ? 'text-[#f472b6]' : 'text-[#fef08a]'} opacity-80 drop-shadow-sm`} />
+      </div>
+    ))}
+  </div>
+);
+
+const NavBar = ({ current, onSelect }: { current: string, onSelect: (v: string) => void }) => (
+  <div className="fixed bottom-0 left-0 right-0 h-[80px] bg-[#fffdf7] border-t border-[#fefce8] flex justify-center gap-12 items-center px-6 z-40 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+    <button onClick={() => onSelect('home')} className="flex flex-col items-center justify-center gap-1 min-w-[80px]">
+      <div className={`px-5 py-1.5 rounded-full transition-all duration-300 ${current === 'home' ? 'bg-[#fbcfe8] text-[#831843]' : 'text-stone-500 hover:bg-[#fefce8]'}`}>
+        <LayoutDashboard className="w-6 h-6" />
+      </div>
+      <span className={`text-[12px] font-medium transition-colors ${current === 'home' ? 'text-[#831843]' : 'text-stone-500'}`}>Прогресс</span>
+    </button>
+    <button onClick={() => onSelect('workout')} className="flex flex-col items-center justify-center gap-1 min-w-[80px]">
+      <div className={`px-5 py-1.5 rounded-full transition-all duration-300 ${current === 'workout' ? 'bg-[#fbcfe8] text-[#831843]' : 'text-stone-500 hover:bg-[#fefce8]'}`}>
+        <Dumbbell className="w-6 h-6" />
+      </div>
+      <span className={`text-[12px] font-medium transition-colors ${current === 'workout' ? 'text-[#831843]' : 'text-stone-500'}`}>Тренировка</span>
+    </button>
+  </div>
+);
+
 // --- Main App Component ---
-
 export default function App() {
-  // --- State ---
-  const [view, setView] = useState<'home' | 'workout'>('home');
-  
-  // Current Date handling for resetting progress
-  const getLocalDateString = (d: Date = new Date()) => {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
-
+  const [view, setView] = useState<'home' | 'workout' | 'completion'>('home');
   const [currentDateStr] = useState(getLocalDateString());
   const activeDay = parseDateSafe(currentDateStr).getDay();
   const isWorkoutDay = activeDay === 1 || activeDay === 3 || activeDay === 5;
   const workoutData = WORKOUTS[activeDay];
 
-  // Exercises Progress (array of set IDs, e.g. "d1e1-0", "d1e1-1")
+  // Exercises Progress
   const [completedSets, setCompletedSets] = useState<string[]>(() => {
-    const today = getLocalDateString();
-    const stored = localStorage.getItem('workout_progress_v2');
-    if (stored) {
-      try {
+    try {
+      const stored = localStorage.getItem('workout_progress_v2');
+      if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.date === today) {
-          return parsed.completedSets || [];
-        }
-      } catch (e) {}
-    }
+        if (parsed.date === currentDateStr) return parsed.completedSets || [];
+      }
+    } catch (e) {}
     return [];
   });
   
   // Workout Stats History
   const [stats, setStats] = useState(() => {
-    const stored = localStorage.getItem('workout_stats_v3');
-    if (stored) {
-      try { 
+    try { 
+      const stored = localStorage.getItem('workout_stats_v3');
+      if (stored) {
         const parsed = JSON.parse(stored);
         if (typeof parsed.totalTimeSeconds !== 'number') parsed.totalTimeSeconds = 0;
         return parsed;
-      } catch (e) {}
-    }
-    return { installDate: getLocalDateString(), completedDates: [] as string[], totalTimeSeconds: 0 };
+      }
+    } catch (e) {}
+    return { installDate: currentDateStr, completedDates: [] as string[], totalTimeSeconds: 0 };
   });
 
-  // Timer State
-  const [timerRemaining, setTimerRemaining] = useState<number | null>(null);
-  const [timerDuration, setTimerDuration] = useState<number>(90); // default 90s
-  const [timerActive, setTimerActive] = useState(false);
-
+  // Audio Context (M3 Refactor: Eager init on interaction)
   const audioCtxRef = useRef<AudioContext | null>(null);
-
-  // --- Effects ---
-
-  // Persist Stats
-  useEffect(() => {
-    localStorage.setItem('workout_stats_v3', JSON.stringify(stats));
-  }, [stats]);
-
-  // Track time spent in workout view
-  const lastTickRef = useRef<number>(Date.now());
-  useEffect(() => {
-    if (view !== 'workout') return;
-    
-    lastTickRef.current = Date.now();
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const delta = Math.floor((now - lastTickRef.current) / 1000);
-      lastTickRef.current = now;
-      setStats(prev => ({ ...prev, totalTimeSeconds: (prev.totalTimeSeconds || 0) + delta }));
-    }, 5000); // tick every 5 seconds
-
-    return () => {
-      clearInterval(interval);
-      const now = Date.now();
-      const delta = Math.floor((now - lastTickRef.current) / 1000);
-      setStats(prev => ({ ...prev, totalTimeSeconds: (prev.totalTimeSeconds || 0) + delta }));
-    };
-  }, [view]);
-
-  // Save progress on change
-  useEffect(() => {
-    if (completedSets.length >= 0) {
-      localStorage.setItem('workout_progress_v2', JSON.stringify({
-        date: currentDateStr,
-        completedSets: completedSets
-      }));
-    }
-  }, [completedSets, currentDateStr]);
-
-  // Timer Tick
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (timerActive && timerRemaining !== null && timerRemaining > 0) {
-      interval = setInterval(() => {
-        setTimerRemaining((prev) => (prev !== null ? prev - 1 : 0));
-      }, 1000);
-    } else if (timerActive && timerRemaining === 0) {
-      setTimerActive(false);
-      playAlarm();
-    }
-    return () => clearInterval(interval);
-  }, [timerActive, timerRemaining]);
-
-  // --- Handlers ---
-
-  const handleToggleSet = (exerciseId: string, setIndex: number, totalSets: number) => {
-    const setId = `${exerciseId}-${setIndex}`;
-    const isDoneNow = !completedSets.includes(setId);
-    
-    if (isDoneNow) {
-      const willBeDone = Array.from({length: totalSets}).every((_, i) => 
-        i === setIndex ? true : completedSets.includes(`${exerciseId}-${i}`)
-      );
-      
-      setCompletedSets(prev => [...prev, setId]);
-      
-      // Auto-start timer if exercise is NOT fully complete yet
-      if (!willBeDone) {
-        startTimer();
-      }
-    } else {
-      setCompletedSets(prev => prev.filter(id => id !== setId));
-    }
-  };
-
-  const initAudio = () => {
+  const initAudio = useCallback(() => {
     if (!audioCtxRef.current) {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass) {
-        audioCtxRef.current = new AudioContextClass();
-      }
+      if (AudioContextClass) audioCtxRef.current = new AudioContextClass();
     }
-    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume();
-    }
-  };
+    if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
+  }, []);
 
-  const playAlarm = () => {
-    if (navigator.vibrate) {
-      navigator.vibrate([200, 100, 200, 100, 500]);
-    }
-    
+  useEffect(() => {
+    const handleTouch = () => { initAudio(); window.removeEventListener('pointerdown', handleTouch); };
+    window.addEventListener('pointerdown', handleTouch);
+    return () => window.removeEventListener('pointerdown', handleTouch);
+  }, [initAudio]);
+
+  const playAlarm = useCallback(() => {
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
     if (audioCtxRef.current) {
       const ctx = audioCtxRef.current;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.2); // E5
-      osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.4); // G5
-      
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.2);
+      osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.4);
       gain.gain.setValueAtTime(0, ctx.currentTime);
       gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.05);
       gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.8);
-      
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.8);
     }
-  };
+  }, []);
 
-  const startTimer = (presetDuration?: number) => {
+  // Timer State (M3 Refactor: Target-based timer to prevent sleep-drift bugs)
+  const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
+  const [timerDuration, setTimerDuration] = useState<number>(90);
+  const [timerRemaining, setTimerRemaining] = useState<number | null>(null);
+
+  const startTimer = useCallback((presetDuration?: number) => {
     initAudio();
     const duration = presetDuration || timerDuration;
     setTimerDuration(duration);
+    setTimerEndTime(Date.now() + duration * 1000);
     setTimerRemaining(duration);
-    setTimerActive(true);
-  };
+  }, [timerDuration, initAudio]);
 
-  const stopTimer = () => {
-    setTimerActive(false);
+  const stopTimer = useCallback(() => {
+    setTimerEndTime(null);
     setTimerRemaining(null);
-  };
+  }, []);
 
-  const formatTime = (seconds: number | null) => {
-    if (seconds === null) return "0:00";
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  useEffect(() => {
+    if (timerEndTime === null) return;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const remaining = Math.ceil((timerEndTime - now) / 1000);
+      if (remaining <= 0) {
+        setTimerRemaining(0);
+        setTimerEndTime(null);
+        playAlarm();
+      } else {
+        setTimerRemaining(remaining);
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [timerEndTime, playAlarm]);
 
-  const formatTotalWorkoutTime = (totalSeconds: number) => {
-    if (!totalSeconds) return "0 мин";
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    if (h > 0) return `${h} ч ${m} м`;
-    return `${m} мин`;
-  };
+  // Effects & Persist
+  useEffect(() => {
+    localStorage.setItem('workout_stats_v3', JSON.stringify(stats));
+  }, [stats]);
 
-  // --- Derived State ---
+  useEffect(() => {
+    localStorage.setItem('workout_progress_v2', JSON.stringify({ date: currentDateStr, completedSets }));
+  }, [completedSets, currentDateStr]);
+
+  // Derived State
   const completedExercisesCount = workoutData?.exercises.filter(ex => 
     Array.from({length: ex.numSets}).every((_, i) => completedSets.includes(`${ex.id}-${i}`))
   ).length || 0;
 
   const isWorkoutDayFullyCompleted = workoutData && workoutData.exercises.length > 0 && completedExercisesCount === workoutData.exercises.length;
 
+  // Track time spent (M3 Refactor: Capped delta to avoid massive jumps after sleep)
+  const lastTickRef = useRef<number>(Date.now());
+  useEffect(() => {
+    if (view !== 'workout' || isWorkoutDayFullyCompleted) return;
+    lastTickRef.current = Date.now();
+    const interval = setInterval(() => {
+      const now = Date.now();
+      let delta = Math.floor((now - lastTickRef.current) / 1000);
+      if (delta > 300) delta = 5; // Cap at 5 mins idle to avoid sleep bugs
+      lastTickRef.current = now;
+      setStats(prev => ({ ...prev, totalTimeSeconds: (prev.totalTimeSeconds || 0) + delta }));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [view, isWorkoutDayFullyCompleted]);
+
+  // Handlers
+  const handleToggleSet = (exerciseId: string, setIndex: number, totalSets: number) => {
+    const setId = `${exerciseId}-${setIndex}`;
+    const isDoneNow = !completedSets.includes(setId);
+    
+    if (isDoneNow) {
+      const willBeDone = Array.from({length: totalSets}).every((_, i) => i === setIndex ? true : completedSets.includes(`${exerciseId}-${i}`));
+      
+      setCompletedSets(prev => {
+        const next = [...prev, setId];
+        const totalSetsForDay = workoutData?.exercises.reduce((sum, ex) => sum + ex.numSets, 0) || 0;
+        
+        if (next.length >= totalSetsForDay) {
+          setTimeout(() => setView('completion'), 800);
+        } else if (!willBeDone) {
+          startTimer();
+        }
+        return next;
+      });
+    } else {
+      setCompletedSets(prev => prev.filter(id => id !== setId));
+    }
+  };
+
   useEffect(() => {
     if (!isWorkoutDay) return;
     setStats(prev => {
       const hasToday = prev.completedDates.includes(currentDateStr);
-      if (isWorkoutDayFullyCompleted && !hasToday) {
-        return { ...prev, completedDates: [...prev.completedDates, currentDateStr] };
-      }
-      if (!isWorkoutDayFullyCompleted && hasToday) {
-        return { ...prev, completedDates: prev.completedDates.filter((d: string) => d !== currentDateStr) };
-      }
+      if (isWorkoutDayFullyCompleted && !hasToday) return { ...prev, completedDates: [...prev.completedDates, currentDateStr] };
+      if (!isWorkoutDayFullyCompleted && hasToday) return { ...prev, completedDates: prev.completedDates.filter((d: string) => d !== currentDateStr) };
       return prev;
     });
   }, [isWorkoutDay, isWorkoutDayFullyCompleted, currentDateStr]);
 
   const { misses, completedWeeks, missedLastWorkout, mockingMessage, currentWeekStatus } = useMemo(() => {
       let missesCount = 0;
-
       let currentD = parseDateSafe(stats.installDate);
       const todayD = parseDateSafe(currentDateStr);
       
@@ -319,9 +351,7 @@ export default function App() {
           const legacyDStr = `${currentD.getFullYear()}-${currentD.getMonth() + 1}-${currentD.getDate()}`;
           const day = currentD.getDay();
           if ([1, 3, 5].includes(day)) {
-              if (!stats.completedDates.includes(dStr) && !stats.completedDates.includes(legacyDStr)) {
-                  missesCount++;
-              }
+              if (!stats.completedDates.includes(dStr) && !stats.completedDates.includes(legacyDStr)) missesCount++;
           }
           currentD.setDate(currentD.getDate() + 1);
       }
@@ -335,9 +365,7 @@ export default function App() {
           if ([1, 3, 5].includes(lastD.getDay())) {
               const dStr = getLocalDateString(lastD);
               const legacyDStr = `${lastD.getFullYear()}-${lastD.getMonth() + 1}-${lastD.getDate()}`;
-              if (!stats.completedDates.includes(dStr) && !stats.completedDates.includes(legacyDStr)) {
-                  missedLast = true;
-              }
+              if (!stats.completedDates.includes(dStr) && !stats.completedDates.includes(legacyDStr)) missedLast = true;
               break;
           }
           lastD.setDate(lastD.getDate() - 1);
@@ -356,31 +384,15 @@ export default function App() {
       let msg = "";
       if (missedLast) {
           let list = [];
-          if (missesCount <= 2) {
-              list = [
-                  "Эй, отдыхающий, пропуск тренировки был жизненно необходим?",
-                  "Твои мышцы передают привет и спрашивают, когда ты соизволишь поработать.",
-                  "Опять пропуск? Флаттершай, конечно, добрая, но даже она неодобрительно качает головой."
-              ];
-          } else if (missesCount <= 5) {
-              list = [
-                  "Эй, неудачник, диван сам себя не пролежит, да? Очередной пропуск.",
-                  "Так мы форму не построим. Твои отговорки уже не работают.",
-                  "Три пропуска? Ты вообще собираешься тренироваться, или это приложение чисто для красоты?"
-              ];
-          } else {
-              list = [
-                  "Слушай, тряпка. Ты либо тренируешься, либо удаляй приложение. Хватит позориться.",
-                  "Твоя лень достигла космических масштабов. Очередной пропуск? Кто бы сомневался.",
-                  "Ноль дисциплины. Абсолютный ноль. Возвращайся, когда у тебя появится хоть капля силы воли."
-              ];
-          }
+          if (missesCount <= 2) list = ["Эй, отдыхающий, пропуск был жизненно необходим?", "Твои мышцы передают привет.", "Даже Флаттершай неодобрительно качает головой."];
+          else if (missesCount <= 5) list = ["Эй, диван сам себя не пролежит, да?", "Так форму не построим.", "Очередной пропуск. Ищем отговорки дальше?"];
+          else list = ["Хватит позориться, тряпка.", "Твоя лень достигла космических масштабов.", "Ноль дисциплины. Абсолютный ноль."];
           const seed = todayD.getTime() / 86400000;
           msg = list[Math.floor(seed) % list.length];
       }
 
       const currentWeekDays = [1, 3, 5];
-      const currentWeekStatus = currentWeekDays.map(targetDay => {
+      const weekStatus = currentWeekDays.map(targetDay => {
           const d = parseDateSafe(currentDateStr);
           const currentDay = d.getDay() || 7;
           d.setDate(d.getDate() - currentDay + targetDay);
@@ -394,285 +406,266 @@ export default function App() {
           };
       });
 
-      return { misses: missesCount, completedWeeks: cWeeks, missedLastWorkout: missedLast, mockingMessage: msg, currentWeekStatus };
+      return { misses: missesCount, completedWeeks: cWeeks, missedLastWorkout: missedLast, mockingMessage: msg, currentWeekStatus: weekStatus };
   }, [stats, currentDateStr]);
 
   // --- Render ---
   return (
-    <div className={`bg-[#fffdf7] text-stone-800 font-sans selection:bg-pink-200 relative w-full ${view === 'home' ? 'h-[100dvh] overflow-hidden flex flex-col' : 'min-h-screen overflow-x-hidden pb-32'}`}>
-      
-      {/* Background Decorations */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden opacity-40 z-0">
-        <Flower2 className="absolute top-10 left-4 text-pink-300 w-12 h-12 rotate-12" />
-        <Flower2 className="absolute top-40 right-4 text-pink-300 w-8 h-8 -rotate-12 opacity-60" />
-        <Butterfly className="absolute top-20 right-10 w-10 h-10" />
-        <Butterfly className="absolute bottom-40 left-8 w-8 h-8 -scale-x-100 rotate-45" />
-      </div>
-
-      <div className={`max-w-md mx-auto relative z-10 w-full ${view === 'home' ? 'flex-1 flex flex-col' : ''}`}>
+    <div className="bg-gradient-to-br from-[#fffdf7] via-[#fffdf7] to-[#fdf2f8] text-stone-900 font-sans min-h-screen pb-24 selection:bg-pink-200 relative">
+      <BackgroundDecorations />
+      <div className="max-w-md mx-auto relative z-10 w-full flex-col">
         
-        {view === 'home' ? (
-          <div className="px-5 py-4 flex flex-col justify-center h-full space-y-3">
-            <header className="text-center mb-2 relative mt-auto">
-              <Butterfly className="w-10 h-10 mx-auto mb-2 text-[#ec4899]" />
-              <h1 className="text-2xl font-bold text-stone-800 tracking-tight">Твой Прогресс</h1>
+        {view === 'home' && (
+          <div className="px-5 py-8 flex flex-col space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-20">
+            <header className="mb-4 mt-2 relative flex flex-col items-center text-center">
+              <Butterfly className="w-16 h-16 mb-2 text-[#db2777]" />
+              <h1 className="text-[2.2rem] leading-tight font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#f472b6] via-[#db2777] to-[#eab308] drop-shadow-sm pb-2">
+                Fluttershy<br/>Training
+              </h1>
             </header>
 
             {missedLastWorkout && (
-              <div className="bg-[#fee2e2] text-[#991b1b] p-4 rounded-[24px] relative overflow-hidden shadow-sm">
-                <div className="font-bold mb-1 flex items-center gap-2 text-sm">
-                  Пропуск зафиксирован 🚨
+              <div className="bg-[#fee2e2] text-[#991b1b] p-4 rounded-[24px] shadow-sm flex items-start gap-3 border border-[#fca5a5]/30">
+                <div className="bg-[#fca5a5] p-2 rounded-full mt-0.5 shadow-sm text-lg leading-none">🚨</div>
+                <div className="flex-1">
+                  <div className="font-bold text-sm mb-1 tracking-wide">Пропуск зафиксирован</div>
+                  <p className="text-[#991b1b]/80 text-xs font-medium leading-relaxed">{mockingMessage}</p>
                 </div>
-                <p className="text-[#991b1b]/90 text-xs font-medium leading-relaxed">{mockingMessage}</p>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-[#fbcfe8] p-4 rounded-[24px] shadow-sm flex flex-col items-center justify-center text-center">
-                <div className="text-4xl font-black text-[#831843] mb-1">{completedWeeks}</div>
-                <div className="text-[10px] font-bold text-[#831843] uppercase tracking-wider leading-tight">Идеальных<br/>недель</div>
+              <div className="bg-[#fbcfe8] p-5 rounded-[24px] shadow-sm flex flex-col justify-center">
+                <div className="text-[11px] font-bold text-[#831843] uppercase tracking-wider mb-2 opacity-90">Идеальные недели</div>
+                <div className="text-5xl font-normal text-[#831843] tracking-tighter">{completedWeeks}</div>
               </div>
-              <div className="bg-[#fef08a] p-4 rounded-[24px] shadow-sm flex flex-col items-center justify-center text-center">
-                <div className="text-4xl font-black text-[#713f12] mb-1">{misses}</div>
-                <div className="text-[10px] font-bold text-[#713f12] uppercase tracking-wider leading-tight">Пропусков<br/>всего</div>
+              <div className="bg-[#fef08a] p-5 rounded-[24px] shadow-sm flex flex-col justify-center">
+                <div className="text-[11px] font-bold text-[#713f12] uppercase tracking-wider mb-2 opacity-90">Пропусков всего</div>
+                <div className="text-5xl font-normal text-[#713f12] tracking-tighter">{misses}</div>
               </div>
             </div>
 
-            <div className="bg-[#fef9c3] p-4 rounded-[24px] shadow-sm flex flex-col">
-              <div className="flex justify-between items-end mb-2">
-                <div className="text-sm font-bold text-[#713f12]">Прогресс текущей недели</div>
-                <div className="text-xs font-semibold text-[#713f12]/70">
+            <div className="bg-[#fefce8] border border-[#fef08a]/50 p-5 rounded-[24px] shadow-sm flex flex-col mt-2">
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm font-medium text-[#713f12]">Эта неделя</div>
+                <div className="text-[11px] font-bold bg-[#fef08a] px-3 py-1 rounded-full text-[#713f12]">
                    {currentWeekStatus.filter(d => d.done).length} / 3
                 </div>
               </div>
               <div className="flex justify-between gap-2">
                 {currentWeekStatus.map((day, idx) => (
-                  <div key={idx} className={`flex-1 flex flex-col items-center justify-center p-2 rounded-2xl transition-all ${
+                  <div key={idx} className={`flex-1 flex flex-col items-center justify-center p-3 rounded-[20px] transition-all ${
                       day.done ? 'bg-[#dcfce7] text-[#166534]' : 
                       day.isToday ? 'bg-[#fbcfe8] text-[#831843] shadow-sm' :
                       day.isPast ? 'bg-[#fee2e2] text-[#991b1b]' :
-                      'bg-[#fffdf7] text-[#713f12]/50'
+                      'bg-[#fffdf7] border border-[#fef08a]/30 text-[#713f12]/50'
                   }`}>
-                    <span className="text-[10px] font-bold uppercase mb-1 opacity-80 tracking-wider">{day.label}</span>
+                    <span className="text-[11px] font-bold uppercase mb-1.5 opacity-80">{day.label}</span>
                     {day.done ? <Check className="w-5 h-5" strokeWidth={3} /> : <div className="w-5 h-5 rounded-full border-2 border-current opacity-30" />}
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-[#fff8cd] p-4 rounded-[24px] shadow-sm flex flex-col items-center justify-center text-center">
-              <div className="text-3xl font-black text-[#713f12] mb-1">{formatTotalWorkoutTime(stats.totalTimeSeconds || 0)}</div>
-              <div className="text-[10px] font-bold text-[#713f12] uppercase tracking-wider leading-tight">Общее время тренировок</div>
+            <div className="bg-[#fffdf7] border border-[#fef08a]/30 p-5 rounded-[24px] shadow-sm flex flex-col justify-center items-center mt-2">
+              <div className="text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-2">Общее время тренировок</div>
+              <div className="text-3xl font-medium text-stone-800 tracking-tight">{formatTotalWorkoutTime(stats.totalTimeSeconds || 0)}</div>
             </div>
 
-            <div className="pt-1 mb-auto pb-2">
+            {isWorkoutDay && !isWorkoutDayFullyCompleted && (
               <button 
-                onClick={() => setView('workout')} 
-                className="w-full bg-[#ec4899] text-white font-bold text-lg py-4 rounded-full shadow-md active:bg-[#db2777] transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                onClick={() => setView('workout')}
+                className="w-full mt-2 bg-[#db2777] text-white px-5 py-4 rounded-full shadow-sm hover:shadow-md hover:bg-[#be185d] active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-medium"
               >
-                {isWorkoutDay && !isWorkoutDayFullyCompleted ? <><Play fill="currentColor" className="w-5 h-5"/> Начать тренировку</> : 'Посмотреть расписание'}
+                <Play fill="currentColor" className="w-5 h-5" />
+                <span>Начать тренировку</span>
               </button>
-            </div>
+            )}
+
           </div>
-        ) : (
-          <>
-            {/* Header */}
-            <header className="pt-8 pb-6 px-6 bg-[#fef9c3] rounded-b-[32px] shadow-sm mb-6 flex flex-col items-center relative">
-              <button 
-                onClick={() => setView('home')}
-                className="absolute top-4 left-4 p-2 text-[#713f12] hover:bg-white/50 transition-colors bg-white/30 rounded-full"
-                aria-label="Назад"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
+        )}
 
-              <div className="flex items-center gap-2 mb-2 mt-4">
-                <Butterfly className="w-6 h-6 text-[#ec4899]" />
-                <h1 className="text-2xl font-bold text-[#713f12] tracking-tight">Трекер Тренировок</h1>
-                <Butterfly className="w-6 h-6 -scale-x-100 text-[#ec4899]" />
-              </div>
-              
-              <p className="text-lg font-medium text-[#db2777] mb-1">
-                 {isWorkoutDay && workoutData ? `${workoutData.dayName} (${DAY_NAMES[activeDay]})` : DAY_NAMES[activeDay]}
+        {view === 'workout' && (
+          <div className="flex flex-col animate-in fade-in slide-in-from-right-4 duration-500">
+            <header className="px-5 pt-8 pb-4 bg-[#fffdf7]/90 backdrop-blur-md sticky top-0 z-30 shadow-sm">
+              <h1 className="text-3xl font-medium tracking-tight text-stone-900">Тренировка</h1>
+              <p className="text-sm font-medium text-[#db2777] mt-1">
+                 {isWorkoutDay && workoutData ? `${workoutData.dayName} • ${workoutData.focus}` : 'Отдых'}
               </p>
               
               {isWorkoutDay && workoutData && (
-                <div className="flex flex-col items-center mt-3 w-full">
-                  <span className="text-sm font-semibold uppercase tracking-wider text-[#713f12] mb-2 bg-[#fef08a] px-4 py-1 rounded-full shadow-sm">
-                    {workoutData.focus}
-                  </span>
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full max-w-[200px] mt-2">
-                    <div className="flex justify-between text-xs font-bold text-[#713f12]/70 mb-1">
-                      <span>Прогресс</span>
-                      <span>{completedExercisesCount} / {workoutData.exercises.length}</span>
-                    </div>
-                    <div className="h-3 w-full bg-[#fef08a] rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-[#ec4899] transition-all duration-500 ease-out rounded-full"
-                        style={{ width: `${(completedExercisesCount / workoutData.exercises.length) * 100}%` }}
-                      />
-                    </div>
-                  </div>
+                <div className="mt-5 h-2.5 w-full bg-[#fef08a] rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-[#db2777] transition-all duration-700 ease-out rounded-full"
+                    style={{ width: `${(completedExercisesCount / workoutData.exercises.length) * 100}%` }}
+                  />
                 </div>
               )}
             </header>
 
-            {/* Main Content */}
-            <main className="px-4">
-          {!isWorkoutDay ? (
-            // Rest Day View
-            <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-[#fef9c3] rounded-[32px] shadow-sm">
-              <div className="text-6xl mb-6 drop-shadow-sm">💤</div>
-              <h2 className="text-2xl font-bold text-[#713f12] mb-3">Сегодня день отдыха</h2>
-              <p className="text-[#713f12]/80 text-lg">
-                Вашим мышцам нужно время на восстановление. Наслаждайтесь отдыхом!
-              </p>
-              <div className="flex gap-4 mt-8 opacity-70">
-                <Flower2 className="w-8 h-8 text-[#ec4899]" />
-                <Flower2 className="w-8 h-8 text-[#eab308]" />
-                <Flower2 className="w-8 h-8 text-[#ec4899]" />
-              </div>
-            </div>
-          ) : (
-            // Workout Day View
-            <div className="space-y-4">
-              {workoutData?.exercises.map((exercise, index) => {
-                const isExerciseDone = Array.from({length: exercise.numSets}).every((_, i) => completedSets.includes(`${exercise.id}-${i}`));
-                
-                return (
-                  <div 
-                    key={exercise.id} 
-                    className={`p-5 rounded-[28px] transition-all duration-300 shadow-sm relative overflow-hidden border-2 ${
-                      isExerciseDone 
-                        ? 'bg-[#dcfce7] border-[#dcfce7] text-[#166534]' 
-                        : 'bg-[#fffdf7] border-[#fef9c3]/50 shadow-md'
-                    }`}
-                  >
-                    {isExerciseDone && (
-                      <div className="absolute -right-4 -top-4 w-20 h-20 bg-green-200/40 rounded-full blur-xl pointer-events-none" />
-                    )}
+            <main className="px-5 py-4">
+              {!isWorkoutDay ? (
+                <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-[#fefce8] border border-[#fef08a]/50 rounded-[32px] shadow-sm">
+                  <div className="text-6xl mb-6">💤</div>
+                  <h2 className="text-2xl font-medium text-[#713f12] mb-3">Сегодня день отдыха</h2>
+                  <p className="text-[#713f12]/80 text-[15px] leading-relaxed">Вашим мышцам нужно время на восстановление. Наслаждайтесь заслуженным отдыхом!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {workoutData?.exercises.map((exercise, index) => {
+                    const isExerciseDone = Array.from({length: exercise.numSets}).every((_, i) => completedSets.includes(`${exercise.id}-${i}`));
                     
-                    <div className="relative z-10">
-                      <h3 className={`text-lg font-bold leading-tight mb-2 transition-all ${
-                        isExerciseDone ? 'text-[#166534]/70 line-through' : 'text-stone-800'
-                      }`}>
-                        <span className={`${isExerciseDone ? 'text-[#166534]/50' : 'text-[#db2777]'} mr-1.5 opacity-80`}>{index + 1}.</span>
-                        {exercise.title}
-                      </h3>
-                      
-                      {exercise.imageId && (
-                        <ExerciseImages imageId={exercise.imageId} isDone={isExerciseDone} />
-                      )}
-                      
-                      <div className={`space-y-1.5 text-sm ${isExerciseDone ? 'text-[#166534]/70' : 'text-stone-600'}`}>
-                        <div className={`flex items-center gap-2 w-fit px-3 py-1 rounded-xl ${isExerciseDone ? 'bg-[#bbf7d0]' : 'bg-[#fef9c3]'}`}>
-                          <span className={`font-semibold ${isExerciseDone ? 'text-[#166534]' : 'text-[#713f12]'}`}>{exercise.setsText}</span>
-                          <span className="opacity-40">|</span>
-                          <span className={isExerciseDone ? 'text-[#166534]' : 'text-[#713f12]'}>{exercise.reps}</span>
-                        </div>
-                        
-                        {exercise.tempo && exercise.tempo !== '-' && (
-                          <div className={`flex items-start gap-2 mt-2 text-xs px-1 ${isExerciseDone ? 'text-[#166534]/70' : 'text-stone-500'}`}>
-                            <Timer className="w-4 h-4 shrink-0 opacity-60" />
-                            <span className="leading-snug">Темп: {exercise.tempo}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Sets Checkboxes */}
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {Array.from({length: exercise.numSets}).map((_, i) => {
-                          const isSetDone = completedSets.includes(`${exercise.id}-${i}`);
-                          return (
-                            <button
-                              key={i}
-                              onClick={() => handleToggleSet(exercise.id, i, exercise.numSets)}
-                              className={`px-2 py-2 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all flex-1 min-w-[50px] border-2 ${
-                                isSetDone
-                                  ? 'bg-[#166534] border-[#166534] text-white shadow-md'
-                                  : 'bg-[#fef9c3] border-[#fef9c3] text-[#713f12] hover:border-[#fde047]'
-                              }`}
-                            >
-                              <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Подход</span>
-                              <div className="flex items-center justify-center gap-1">
-                                <span className="text-lg font-black leading-none">{i + 1}</span>
-                                {isSetDone && <Check className="w-3.5 h-3.5" strokeWidth={4} />}
+                    return (
+                      <div 
+                        key={exercise.id} 
+                        className={`p-5 rounded-[28px] transition-all duration-300 relative overflow-hidden shadow-sm border ${
+                          isExerciseDone ? 'bg-[#dcfce7] border-[#bbf7d0]' : 'bg-[#fffdf7] border-[#fef08a]/40'
+                        }`}
+                      >
+                        <div className="relative z-10">
+                          <h3 className={`text-[17px] font-medium leading-snug mb-3 transition-colors ${isExerciseDone ? 'text-[#166534]/70 line-through' : 'text-stone-900'}`}>
+                            <span className={`${isExerciseDone ? 'text-[#166534]/50' : 'text-[#db2777]'} mr-2`}>{index + 1}.</span>
+                            {exercise.title}
+                          </h3>
+                          
+                          {exercise.imageId && <ExerciseImages imageId={exercise.imageId} isDone={isExerciseDone} />}
+                          
+                          <div className={`space-y-2 text-sm ${isExerciseDone ? 'text-[#166534]/70' : 'text-stone-600'}`}>
+                            <div className={`flex items-center gap-2 w-fit px-3 py-1.5 rounded-[12px] font-medium ${isExerciseDone ? 'bg-[#bbf7d0]/60' : 'bg-[#fefce8]'}`}>
+                              <span className={isExerciseDone ? 'text-[#166534]' : 'text-[#713f12]'}>{exercise.setsText}</span>
+                              <span className="opacity-30">|</span>
+                              <span className={isExerciseDone ? 'text-[#166534]' : 'text-[#713f12]'}>{exercise.reps}</span>
+                            </div>
+                            
+                            {exercise.tempo && exercise.tempo !== '-' && (
+                              <div className="flex items-center gap-2 mt-2 text-[13px] px-1 opacity-80">
+                                <Timer className="w-4 h-4 shrink-0" />
+                                <span>Темп: {exercise.tempo}</span>
                               </div>
-                            </button>
-                          );
-                        })}
+                            )}
+                          </div>
+
+                          <div className="mt-5 flex flex-wrap gap-2">
+                            {Array.from({length: exercise.numSets}).map((_, i) => {
+                              const isSetDone = completedSets.includes(`${exercise.id}-${i}`);
+                              return (
+                                <button
+                                  key={i}
+                                  onClick={() => handleToggleSet(exercise.id, i, exercise.numSets)}
+                                  className={`py-3 rounded-[16px] flex flex-col items-center justify-center gap-1 transition-all flex-1 min-w-[50px] shadow-sm active:scale-95 ${
+                                    isSetDone
+                                      ? 'bg-[#16a34a] text-white border-transparent'
+                                      : 'bg-[#fefce8] text-[#713f12] border border-[#fef08a] hover:bg-[#fef08a]'
+                                  }`}
+                                >
+                                  <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">Сет</span>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="text-lg font-medium leading-none">{i + 1}</span>
+                                    {isSetDone && <Check className="w-3.5 h-3.5" strokeWidth={4} />}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
+            </main>
+          </div>
+        )}
+        
+        {view === 'completion' && (
+          <div className="fixed inset-0 z-50 bg-gradient-to-br from-[#fdf2f8] via-[#fffdf7] to-[#fefce8] flex flex-col items-center justify-center px-6 animate-in fade-in zoom-in-95 duration-700">
+            <ButterflyConfetti />
+            
+            <div className="relative z-10 flex flex-col items-center text-center max-w-sm w-full">
+              <div className="w-24 h-24 bg-[#fbcfe8] rounded-full flex items-center justify-center mb-6 shadow-lg shadow-pink-200/50 animate-bounce" style={{ animationDuration: '3s' }}>
+                 <Flower2 className="w-12 h-12 text-[#db2777]" />
+              </div>
+              
+              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#f472b6] to-[#eab308] drop-shadow-sm mb-5 leading-tight">
+                Тренировка окончена!
+              </h1>
+              
+              <div className="bg-white/70 backdrop-blur-md p-6 rounded-[32px] border border-white shadow-xl shadow-pink-100/50 mb-8 w-full">
+                <p className="text-[#831843] text-[16px] font-medium leading-relaxed italic">
+                  "{FLUTTERSHY_QUOTES[activeDay % FLUTTERSHY_QUOTES.length]}"
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 w-full mb-10">
+                <div className="bg-[#dcfce7] p-5 rounded-[24px] shadow-sm flex flex-col items-center justify-center border border-[#bbf7d0]/50">
+                   <div className="text-4xl font-black text-[#166534] mb-1 tracking-tighter">{workoutData?.exercises.length}</div>
+                   <div className="text-[10px] font-bold text-[#166534]/70 uppercase tracking-wider">Упражнений</div>
+                </div>
+                <div className="bg-[#fff8cd] p-5 rounded-[24px] shadow-sm flex flex-col items-center justify-center border border-[#fef08a]/50">
+                   <div className="text-4xl font-black text-[#713f12] mb-1 tracking-tighter">{formatTotalWorkoutTime(stats.totalTimeSeconds || 0)}</div>
+                   <div className="text-[10px] font-bold text-[#713f12]/70 uppercase tracking-wider">Общее время</div>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setView('home')}
+                className="w-full bg-gradient-to-r from-[#f472b6] to-[#db2777] text-white px-5 py-4 rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 font-bold text-lg"
+              >
+                Вернуться на главный экран
+              </button>
             </div>
-          )}
-        </main>
-        </>
+          </div>
         )}
       </div>
 
-      {/* Floating Timer UI */}
-      {timerActive && (
-        <div className="fixed bottom-6 left-0 right-0 px-4 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 flex justify-center">
-          <div className="bg-[#fff8cd] max-w-sm w-full p-4 rounded-[32px] shadow-xl flex flex-col gap-3">
-            <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-2 text-[#713f12] font-medium">
-                <Timer className="w-5 h-5 text-[#db2777]" />
-                Таймер отдыха
-              </div>
-              <button 
-                onClick={stopTimer}
-                className="text-[#713f12]/50 hover:text-[#713f12] p-1 bg-white/30 rounded-full"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="text-center font-mono text-5xl font-bold tracking-tight text-[#713f12] my-1 flex justify-center items-center gap-2">
-              {formatTime(timerRemaining)}
-              {timerRemaining === 0 && <Volume2 className="w-8 h-8 text-[#db2777] animate-pulse" />}
-            </div>
+      {/* Navigation Bar M3 */}
+      <NavBar current={view} onSelect={(v) => setView(v as 'home'|'workout')} />
 
-            <div className="grid grid-cols-3 gap-2">
-              {[60, 90, 120].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => startTimer(t)}
-                  className={`py-2 rounded-2xl text-sm font-bold transition-colors ${
-                    timerDuration === t 
-                      ? 'bg-[#ec4899] text-white shadow-md' 
-                      : 'bg-white/50 text-[#713f12] hover:bg-white/80'
-                  }`}
-                >
-                  {t} сек
+      {/* Timer M3 Bottom Sheet */}
+      {timerEndTime !== null && (
+        <>
+          <div className="fixed inset-0 bg-stone-900/30 backdrop-blur-sm z-50 transition-opacity animate-in fade-in" onClick={stopTimer} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom-full duration-300">
+            <div className="bg-[#fffdf7] rounded-t-[32px] p-6 pb-10 shadow-2xl flex flex-col gap-4">
+              <div className="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-2" />
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-stone-800 font-medium">
+                  <Timer className="w-5 h-5 text-[#db2777]" />
+                  Таймер отдыха
+                </div>
+                <button onClick={stopTimer} className="p-2 bg-stone-100 text-stone-600 rounded-full hover:bg-stone-200 transition-colors">
+                  <X className="w-5 h-5" />
                 </button>
-              ))}
-            </div>
-            
-            {timerRemaining === 0 ? (
-              <button
-                onClick={stopTimer}
-                className="w-full py-4 bg-[#ec4899] text-white rounded-full font-bold mt-1 hover:bg-[#db2777] transition-all shadow-md active:scale-95"
-              >
-                Завершить отдых
-              </button>
-            ) : (
-              <button
-                onClick={stopTimer}
-                className="w-full py-4 bg-white/50 text-[#713f12] rounded-full font-bold mt-1 hover:bg-white/80 transition-all flex items-center justify-center gap-2"
-              >
-                <Square className="w-4 h-4 fill-current" />
-                Остановить
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+              </div>
+              
+              <div className="text-center font-mono text-[64px] font-normal tracking-tighter text-stone-900 my-2">
+                {formatTime(timerRemaining)}
+              </div>
 
+              <div className="grid grid-cols-3 gap-3">
+                {[60, 90, 120].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => startTimer(t)}
+                    className={`py-3.5 rounded-[16px] text-sm font-medium transition-colors active:scale-95 ${
+                      timerDuration === t ? 'bg-[#fbcfe8] text-[#831843]' : 'bg-[#fefce8] border border-[#fef08a]/50 text-[#713f12] hover:bg-[#fef08a]'
+                    }`}
+                  >
+                    {t} сек
+                  </button>
+                ))}
+              </div>
+              
+              {timerRemaining === 0 && (
+                <button onClick={stopTimer} className="w-full py-4 rounded-[16px] bg-[#db2777] text-white font-medium text-lg mt-3 flex items-center justify-center gap-2 animate-pulse active:scale-95 shadow-md">
+                  <Volume2 className="w-6 h-6" /> Завершить отдых
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
