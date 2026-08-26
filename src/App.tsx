@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Check, Timer, Flower2, X, Volume2, Play, LayoutDashboard, Dumbbell } from 'lucide-react';
+import { Check, Timer, Flower2, X, Volume2, Play, LayoutDashboard, Dumbbell, Pause, Square } from 'lucide-react';
 
 // --- Utils & Constants ---
 const parseDateSafe = (dStr: string) => {
@@ -156,7 +156,7 @@ const ButterflyConfetti = () => (
   </div>
 );
 
-const NavBar = ({ current, onSelect }: { current: string, onSelect: (v: string) => void }) => (
+const NavBar = ({ current, onSelect, showWorkout }: { current: string, onSelect: (v: string) => void, showWorkout: boolean }) => (
   <div className="fixed bottom-0 left-0 right-0 h-[80px] bg-[#fffdf7] border-t border-[#fefce8] flex justify-center gap-12 items-center px-6 z-40 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
     <button onClick={() => onSelect('home')} className="flex flex-col items-center justify-center gap-1 min-w-[80px]">
       <div className={`px-5 py-1.5 rounded-full transition-all duration-300 ${current === 'home' ? 'bg-[#fbcfe8] text-[#831843]' : 'text-stone-500 hover:bg-[#fefce8]'}`}>
@@ -164,18 +164,30 @@ const NavBar = ({ current, onSelect }: { current: string, onSelect: (v: string) 
       </div>
       <span className={`text-[12px] font-medium transition-colors ${current === 'home' ? 'text-[#831843]' : 'text-stone-500'}`}>Прогресс</span>
     </button>
-    <button onClick={() => onSelect('workout')} className="flex flex-col items-center justify-center gap-1 min-w-[80px]">
-      <div className={`px-5 py-1.5 rounded-full transition-all duration-300 ${current === 'workout' ? 'bg-[#fbcfe8] text-[#831843]' : 'text-stone-500 hover:bg-[#fefce8]'}`}>
-        <Dumbbell className="w-6 h-6" />
-      </div>
-      <span className={`text-[12px] font-medium transition-colors ${current === 'workout' ? 'text-[#831843]' : 'text-stone-500'}`}>Тренировка</span>
-    </button>
+    {showWorkout && (
+      <button onClick={() => onSelect('workout')} className="flex flex-col items-center justify-center gap-1 min-w-[80px]">
+        <div className={`px-5 py-1.5 rounded-full transition-all duration-300 ${current === 'workout' ? 'bg-[#fbcfe8] text-[#831843]' : 'text-stone-500 hover:bg-[#fefce8]'}`}>
+          <Dumbbell className="w-6 h-6" />
+        </div>
+        <span className={`text-[12px] font-medium transition-colors ${current === 'workout' ? 'text-[#831843]' : 'text-stone-500'}`}>Тренировка</span>
+      </button>
+    )}
   </div>
 );
 
 // --- Main App Component ---
 export default function App() {
   const [view, setView] = useState<'home' | 'workout' | 'completion'>('home');
+  
+  const [isWorkoutActive, setIsWorkoutActive] = useState(() => {
+    return localStorage.getItem('workout_active') === 'true';
+  });
+  const [isWorkoutPaused, setIsWorkoutPaused] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('workout_active', String(isWorkoutActive));
+  }, [isWorkoutActive]);
+
   const [currentDateStr] = useState(getLocalDateString());
   const activeDay = parseDateSafe(currentDateStr).getDay();
   const isWorkoutDay = activeDay === 1 || activeDay === 3 || activeDay === 5;
@@ -295,7 +307,7 @@ export default function App() {
   // Track time spent (M3 Refactor: Capped delta to avoid massive jumps after sleep)
   const lastTickRef = useRef<number>(Date.now());
   useEffect(() => {
-    if (view !== 'workout' || isWorkoutDayFullyCompleted) return;
+    if (view !== 'workout' || isWorkoutDayFullyCompleted || !isWorkoutActive || isWorkoutPaused) return;
     lastTickRef.current = Date.now();
     const interval = setInterval(() => {
       const now = Date.now();
@@ -305,7 +317,7 @@ export default function App() {
       setStats(prev => ({ ...prev, totalTimeSeconds: (prev.totalTimeSeconds || 0) + delta }));
     }, 5000);
     return () => clearInterval(interval);
-  }, [view, isWorkoutDayFullyCompleted]);
+  }, [view, isWorkoutDayFullyCompleted, isWorkoutActive, isWorkoutPaused]);
 
   // Handlers
   const handleToggleSet = (exerciseId: string, setIndex: number, totalSets: number) => {
@@ -330,6 +342,12 @@ export default function App() {
       setCompletedSets(prev => prev.filter(id => id !== setId));
     }
   };
+
+  useEffect(() => {
+    if (isWorkoutDayFullyCompleted && isWorkoutActive) {
+      setIsWorkoutActive(false);
+    }
+  }, [isWorkoutDayFullyCompleted, isWorkoutActive]);
 
   useEffect(() => {
     if (!isWorkoutDay) return;
@@ -474,11 +492,15 @@ export default function App() {
 
             {isWorkoutDay && !isWorkoutDayFullyCompleted && (
               <button 
-                onClick={() => setView('workout')}
+                onClick={() => {
+                  setIsWorkoutActive(true);
+                  setIsWorkoutPaused(false);
+                  setView('workout');
+                }}
                 className="w-full mt-2 bg-[#db2777] text-white px-5 py-4 rounded-full shadow-sm hover:shadow-md hover:bg-[#be185d] active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-medium"
               >
                 <Play fill="currentColor" className="w-5 h-5" />
-                <span>Начать тренировку</span>
+                <span>{isWorkoutActive ? "Продолжить тренировку" : "Начать тренировку"}</span>
               </button>
             )}
 
@@ -571,6 +593,34 @@ export default function App() {
                       </div>
                     );
                   })}
+                  
+                  {isWorkoutActive && (
+                    <div className="mt-8 mb-4 flex flex-col gap-3">
+                      <button
+                        onClick={() => setIsWorkoutPaused(!isWorkoutPaused)}
+                        className={`w-full py-4 rounded-full font-medium flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 border ${
+                          isWorkoutPaused 
+                            ? 'bg-[#dcfce7] text-[#166534] border-[#bbf7d0]' 
+                            : 'bg-[#fff8cd] text-[#713f12] border-[#fef08a]'
+                        }`}
+                      >
+                        {isWorkoutPaused ? <Play fill="currentColor" className="w-5 h-5" /> : <Pause fill="currentColor" className="w-5 h-5" />}
+                        {isWorkoutPaused ? "Возобновить тренировку" : "Пауза тренировки"}
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setIsWorkoutActive(false);
+                          setIsWorkoutPaused(false);
+                          setView('home');
+                        }}
+                        className="w-full py-4 bg-[#fee2e2] text-[#991b1b] rounded-full font-medium flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 border border-[#fca5a5]/30 hover:bg-[#fecaca]"
+                      >
+                        <Square fill="currentColor" className="w-5 h-5" />
+                        Завершить тренировку
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </main>
@@ -578,10 +628,11 @@ export default function App() {
         )}
         
         {view === 'completion' && (
-          <div className="fixed inset-0 z-50 bg-gradient-to-br from-[#fdf2f8] via-[#fffdf7] to-[#fefce8] flex flex-col items-center justify-center px-6 animate-in fade-in zoom-in-95 duration-700">
-            <ButterflyConfetti />
-            
-            <div className="relative z-10 flex flex-col items-center text-center max-w-sm w-full">
+          <div className="fixed inset-0 z-50 bg-gradient-to-br from-[#fdf2f8] via-[#fffdf7] to-[#fefce8] overflow-y-auto animate-in fade-in zoom-in-95 duration-700">
+            <div className="min-h-full w-full flex flex-col items-center justify-center px-6 py-12">
+              <ButterflyConfetti />
+              
+              <div className="relative z-10 flex flex-col items-center text-center max-w-sm w-full">
               <div className="w-24 h-24 bg-[#fbcfe8] rounded-full flex items-center justify-center mb-6 shadow-lg shadow-pink-200/50 animate-bounce" style={{ animationDuration: '3s' }}>
                  <Flower2 className="w-12 h-12 text-[#db2777]" />
               </div>
@@ -608,18 +659,22 @@ export default function App() {
               </div>
               
               <button
-                onClick={() => setView('home')}
+                onClick={() => {
+                  setIsWorkoutActive(false);
+                  setView('home');
+                }}
                 className="w-full bg-gradient-to-r from-[#f472b6] to-[#db2777] text-white px-5 py-4 rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 font-bold text-lg"
               >
                 Вернуться на главный экран
               </button>
+            </div>
             </div>
           </div>
         )}
       </div>
 
       {/* Navigation Bar M3 */}
-      <NavBar current={view} onSelect={(v) => setView(v as 'home'|'workout')} />
+      <NavBar current={view} onSelect={(v) => setView(v as 'home'|'workout')} showWorkout={isWorkoutActive} />
 
       {/* Timer M3 Bottom Sheet */}
       {timerEndTime !== null && (
