@@ -28,27 +28,74 @@ const formatTotalWorkoutTime = (totalSeconds: number) => {
 };
 
 type Exercise = { id: string; title: string; setsText: string; numSets: number; reps: string; tempo?: string; imageId: string; };
-type WorkoutDay = { dayName: string; focus: string; exercises: Exercise[]; };
+type WorkoutDay = { dayName: string; focus: string; phaseName: string; monthNum: number; exercises: Exercise[]; };
 
-const WORKOUTS: Record<number, WorkoutDay> = {
-  1: { dayName: 'День 1', focus: 'Ноги и тяги', exercises: [
-    { id: 'd1e1', title: 'Болгарские сплит-приседания', setsText: '4 подхода', numSets: 4, reps: '10–15 на ногу', tempo: '3 сек вниз, пауза', imageId: 'Split_Squat_with_Dumbbells' },
-    { id: 'd1e2', title: 'Румынская тяга на 1 ноге', setsText: '3 подхода', numSets: 3, reps: '12–15', tempo: '3 сек вниз, подъем', imageId: 'Kettlebell_One-Legged_Deadlift' },
-    { id: 'd1e3', title: 'Тяга штанги в наклоне', setsText: '4 подхода', numSets: 4, reps: '15–20 (до отказа)', tempo: '3 сек вниз', imageId: 'Bent_Over_Barbell_Row' },
-    { id: 'd1e4', title: 'Сгибания на бицепс', setsText: '3 подхода', numSets: 3, reps: '12–15', imageId: 'Barbell_Curl' },
-  ]},
-  3: { dayName: 'День 2', focus: 'Жимы и плечи', exercises: [
-    { id: 'd2e1', title: 'Жим лежа на полу', setsText: '4 подхода', numSets: 4, reps: '15–20', tempo: '3 сек вниз, жим', imageId: 'Dumbbell_Floor_Press' },
-    { id: 'd2e2', title: 'Отжимания от пола', setsText: '4 подхода', numSets: 4, reps: 'До отказа', imageId: 'Pushups' },
-    { id: 'd2e3', title: 'Армейский жим стоя', setsText: '3 подхода', numSets: 3, reps: '12–15', tempo: '3 сек вниз', imageId: 'Standing_Military_Press' },
-    { id: 'd2e4', title: 'Махи гантелями в стороны', setsText: '3 подхода', numSets: 3, reps: '15–20', imageId: 'Side_Lateral_Raise' },
-  ]},
-  5: { dayName: 'День 3', focus: 'Всё тело + кор', exercises: [
-    { id: 'd3e1', title: 'Приседания на груди', setsText: '4 подхода', numSets: 4, reps: '15–20', tempo: '4 сек вниз, пауза', imageId: 'Front_Barbell_Squat' },
-    { id: 'd3e2', title: 'Тяга гантели 1 рукой', setsText: '4 подхода', numSets: 4, reps: '12–15 на руку', imageId: 'One-Arm_Dumbbell_Row' },
-    { id: 'd3e3', title: 'Французский жим', setsText: '3 подхода', numSets: 3, reps: '12–15', imageId: 'Lying_Dumbbell_Tricep_Extension' },
-    { id: 'd3e4', title: 'Скручивания на пресс', setsText: '3 подхода', numSets: 3, reps: 'До отказа', imageId: 'Crunches' },
-  ]}
+const START_DATE = new Date(2026, 9, 30); // Oct 30, 2026
+const END_DATE = new Date(2027, 9, 30); // Oct 30, 2027
+
+const getWorkoutData = (dateStr: string): WorkoutDay | null => {
+  const date = parseDateSafe(dateStr);
+  const activeDay = date.getDay();
+  if (![1, 3, 5].includes(activeDay)) return null;
+
+  let monthIndex = 0;
+  if (date >= START_DATE) {
+    const diffDays = Math.max(0, Math.floor((date.getTime() - START_DATE.getTime()) / (1000 * 60 * 60 * 24)));
+    monthIndex = Math.floor(diffDays / 30);
+    if (monthIndex > 11) monthIndex = 11;
+  }
+
+  const phase = Math.floor(monthIndex / 3);
+  const baseSets = 3 + phase;
+  const repAdd = (monthIndex % 3) * 2;
+  
+  const tempoText = [
+    "Обычный темп (1 сек вниз)",
+    "Контроль (2 сек вниз)",
+    "Взрыв (3 сек вниз, 1 сек пауза)",
+    "Хардкор (4 сек вниз, 2 сек пауза)"
+  ][phase];
+  
+  const phaseNames = [
+    "Фаза 1: Адаптация (Мес. 1-3)",
+    "Фаза 2: Объем (Мес. 4-6)",
+    "Фаза 3: Сила (Мес. 7-9)",
+    "Фаза 4: Пик (Мес. 10-12)"
+  ];
+  
+  const formatReps = (base: number | 'max') => base === 'max' ? 'До отказа' : `${base + repAdd}–${base + repAdd + 3}`;
+
+  if (activeDay === 1) {
+    return {
+      dayName: 'День 1', focus: 'Ноги и Кор', phaseName: phaseNames[phase], monthNum: monthIndex + 1,
+      exercises: [
+        { id: `m${monthIndex}_d1e1`, title: 'Болгарские сплиты (2х10кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(8) + ' на ногу', tempo: tempoText, imageId: 'Split_Squat_with_Dumbbells' },
+        { id: `m${monthIndex}_d1e2`, title: 'Фронт. присед (Штанга 20кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(10), tempo: tempoText, imageId: 'Front_Barbell_Squat' },
+        { id: `m${monthIndex}_d1e3`, title: 'Румынская 1 нога (Гантели)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(10) + ' на ногу', tempo: tempoText, imageId: 'Kettlebell_One-Legged_Deadlift' },
+        { id: `m${monthIndex}_d1e4`, title: 'Скручивания на пресс', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps('max'), tempo: 'Без рывков', imageId: 'Crunches' },
+      ]
+    };
+  }
+  if (activeDay === 3) {
+    return {
+      dayName: 'День 2', focus: 'Грудь, Плечи, Трицепс', phaseName: phaseNames[phase], monthNum: monthIndex + 1,
+      exercises: [
+        { id: `m${monthIndex}_d2e1`, title: 'Жим лежа на полу (2х10кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(10), tempo: tempoText, imageId: 'Dumbbell_Floor_Press' },
+        { id: `m${monthIndex}_d2e2`, title: 'Отжимания от пола', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps('max'), tempo: tempoText, imageId: 'Pushups' },
+        { id: `m${monthIndex}_d2e3`, title: 'Армейский жим (Штанга 20кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(8), tempo: tempoText, imageId: 'Standing_Military_Press' },
+        { id: `m${monthIndex}_d2e4`, title: 'Махи в стороны (2х10кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(10), tempo: tempoText, imageId: 'Side_Lateral_Raise' },
+      ]
+    };
+  }
+  return {
+    dayName: 'День 3', focus: 'Спина и Руки', phaseName: phaseNames[phase], monthNum: monthIndex + 1,
+    exercises: [
+      { id: `m${monthIndex}_d3e1`, title: 'Тяга в наклоне (Штанга 20кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(10), tempo: tempoText, imageId: 'Bent_Over_Barbell_Row' },
+      { id: `m${monthIndex}_d3e2`, title: 'Тяга гантели 1 рукой (10кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(8) + ' на руку', tempo: tempoText, imageId: 'One-Arm_Dumbbell_Row' },
+      { id: `m${monthIndex}_d3e3`, title: 'Сгибания на бицепс (Штанга 20кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(10), tempo: tempoText, imageId: 'Barbell_Curl' },
+      { id: `m${monthIndex}_d3e4`, title: 'Французский жим (Гантель 10кг)', setsText: `${baseSets} подхода`, numSets: baseSets, reps: formatReps(10), tempo: tempoText, imageId: 'Lying_Dumbbell_Tricep_Extension' },
+    ]
+  };
 };
 
 const DAY_NAMES = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
@@ -136,7 +183,8 @@ export default function App() {
 
   const activeDay = parseDateSafe(currentDateStr).getDay();
   const isWorkoutDay = activeDay === 1 || activeDay === 3 || activeDay === 5;
-  const workoutData = isWorkoutDay ? WORKOUTS[activeDay] : null;
+  const isBeforeStart = parseDateSafe(currentDateStr) < START_DATE;
+  const workoutData = useMemo(() => getWorkoutData(currentDateStr), [currentDateStr]);
 
   // Track progress specific to today
   const [completedSets, setCompletedSets] = useState<string[]>(() => {
@@ -330,8 +378,12 @@ export default function App() {
                  <Flower2 className={`w-10 h-10 ${theme.onPrimaryContainer}`} />
               </div>
               <h1 className={`text-4xl leading-tight font-black tracking-tight ${theme.onSurface}`}>
-                Fluttershy<br/>Training
+                Проект "18 лет"
               </h1>
+              <div className={`mt-4 font-medium ${theme.onSurfaceVariant} text-sm flex flex-col gap-1`}>
+                <span>🎯 Цель: 1 год (30 окт 2026 – 30 окт 2027)</span>
+                <span>🏋️ Инвентарь: Штанга 20кг, Гантели 2х10кг</span>
+              </div>
             </header>
 
             {missedLastWorkout && (
@@ -358,7 +410,16 @@ export default function App() {
             <div className={`p-6 rounded-[32px] ${theme.surfaceContainer} shadow-sm`}>
               <h2 className={`text-sm uppercase tracking-wider font-bold ${theme.onSurfaceVariant} mb-4`}>План на сегодня</h2>
               
-              {!isWorkoutDay ? (
+              {isBeforeStart ? (
+                <div className="text-center py-6">
+                  <div className="text-4xl mb-4">⏳</div>
+                  <p className={`font-bold ${theme.onSurfaceVariant} text-lg`}>Подготовка...</p>
+                  <p className={`font-medium ${theme.onSurfaceVariant} mt-2 text-sm opacity-80`}>
+                    Полноценные тренировки начнутся 30 октября 2026.
+                    Сейчас лучше отдохнуть и подготовиться к большому году! 🌸
+                  </p>
+                </div>
+              ) : !isWorkoutDay ? (
                  <div className="text-center py-6">
                    <div className="text-4xl mb-4">💤</div>
                    <p className={`font-medium ${theme.onSurfaceVariant}`}>Отдыхай и восстанавливай силы!</p>
@@ -369,6 +430,9 @@ export default function App() {
                     <div>
                       <div className={`text-xl font-bold ${theme.onSurface}`}>{workoutData!.dayName}</div>
                       <div className={`text-sm ${theme.onSurfaceVariant} mt-1`}>{workoutData!.focus}</div>
+                      <div className={`text-xs font-bold ${theme.onPrimaryContainer} bg-[#ffd9e2] px-2 py-0.5 rounded-md inline-block mt-2`}>
+                        {workoutData!.phaseName} (Месяц {workoutData!.monthNum})
+                      </div>
                     </div>
                     {isWorkoutDayFullyCompleted && (
                       <div className="bg-[#bcf0e4] text-[#005040] px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1">
@@ -394,10 +458,11 @@ export default function App() {
             {isWorkoutDay && !isWorkoutDayFullyCompleted && (
               <button 
                 onClick={handleStartWorkout}
-                className={`w-full mt-2 ${theme.primaryContainer} ${theme.onPrimaryContainer} px-5 py-5 rounded-full hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-bold text-lg`}
+                disabled={isBeforeStart}
+                className={`w-full mt-2 ${theme.primaryContainer} ${theme.onPrimaryContainer} px-5 py-5 rounded-full hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-bold text-lg disabled:opacity-50 disabled:active:scale-100 disabled:hover:opacity-50`}
               >
                 <Play fill="currentColor" className="w-6 h-6" />
-                <span>{completedSets.length > 0 ? "Продолжить" : "Начать"}</span>
+                <span>{isBeforeStart ? "Ожидание старта" : completedSets.length > 0 ? "Продолжить" : "Начать"}</span>
               </button>
             )}
 
@@ -409,8 +474,13 @@ export default function App() {
           <div className="flex flex-col animate-in fade-in slide-in-from-right-4 duration-500">
             <header className={`px-5 pt-10 pb-6 ${theme.surface}/95 backdrop-blur-md sticky top-0 z-30`}>
               <h1 className={`text-3xl font-black tracking-tight ${theme.onSurface}`}>Тренировка</h1>
-              <p className={`text-sm font-medium ${theme.onPrimaryContainer} mt-2`}>
-                 {isWorkoutDay && workoutData ? `${workoutData.dayName} • ${workoutData.focus}` : 'Отдых'}
+              <p className={`text-sm font-medium ${theme.onPrimaryContainer} mt-2 flex flex-col gap-1`}>
+                 <span>{isWorkoutDay && workoutData ? `${workoutData.dayName} • ${workoutData.focus}` : 'Отдых'}</span>
+                 {isWorkoutDay && workoutData && (
+                   <span className={`text-xs font-bold ${theme.onPrimaryContainer} bg-[#ffd9e2] px-2 py-0.5 rounded-md self-start inline-block`}>
+                     {workoutData.phaseName} (Месяц {workoutData.monthNum})
+                   </span>
+                 )}
               </p>
               
               {isWorkoutDay && workoutData && (

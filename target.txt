@@ -1,0 +1,61 @@
+                  <div className={`text-[11px] font-bold ${theme.onSurfaceVariant} uppercase tracking-wider mt-1`}>Общее время</div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`p-6 rounded-[32px] ${theme.surfaceContainer} shadow-sm`}>
+              <h2 className={`text-sm uppercase tracking-wider font-bold ${theme.onSurfaceVariant} mb-4`}>План на сегодня</h2>
+              
+              {!isWorkoutDay ? (
+                 <div className="text-center py-6">
+                   <div className="text-4xl mb-4">💤</div>
+                   <p className={`font-medium ${theme.onSurfaceVariant}`}>Отдыхай и восстанавливай силы!</p>
+                 </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-end mb-4">
+                    <div>
+                      <div className={`text-xl font-bold ${theme.onSurface}`}>{workoutData!.dayName}</div>
+                      <div className={`text-sm ${theme.onSurfaceVariant} mt-1`}>{workoutData!.focus}</div>
+                      <div className={`text-xs font-bold ${theme.onPrimaryContainer} bg-[#ffd9e2] px-2 py-0.5 rounded-md inline-block mt-2`}>
+                        {workoutData!.phaseName} (Месяц {workoutData!.monthNum})
+                      </div>
+                    </div>
+                    {isWorkoutDayFullyCompleted && (
+                      <div className="bg-[#bcf0e4] text-[#005040] px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" /> Выполнено
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-3 mt-5">
+                    {workoutData!.exercises.map((ex, i) => (
+                      <div key={ex.id} className={`flex items-center gap-3 p-3 rounded-[20px] ${theme.surface}`}>
+                        <div className={`w-8 h-8 rounded-full ${theme.secondaryContainer} ${theme.onSecondaryContainer} flex items-center justify-center font-bold text-sm shrink-0`}>
+                          {i+1}
+                        </div>
+                        <div className="text-sm font-medium leading-tight truncate">{ex.title}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {isWorkoutDay && !isWorkoutDayFullyCompleted && (
+              <button 
+                onClick={handleStartWorkout}
+                className={`w-full mt-2 ${theme.primaryContainer} ${theme.onPrimaryContainer} px-5 py-5 rounded-full hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-bold text-lg`}
+              >
+                <Play fill="currentColor" className="w-6 h-6" />
+                <span>{completedSets.length > 0 ? "Продолжить" : "Начать"}</span>
+              </button>
+            )}
+
+            <div className="h-4"></div>
+          </div>
+        )}
+
+        {view === 'workout' && (
+          <div className="flex flex-col animate-in fade-in slide-in-from-right-4 duration-500">
+            <header className={`px-5 pt-10 pb-6 ${theme.surface}/95 backdrop-blur-md sticky top-0 z-30`}>
