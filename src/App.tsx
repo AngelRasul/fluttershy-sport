@@ -11,6 +11,24 @@ const getLocalDateString = (d: Date = new Date()) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const getFinalMessage = (w: number, h: number) => {
+  const gain = w - 57;
+  let msg = "";
+  if (gain >= 15) msg = "Абсолютный чемпион! 🔥 Ты превзошел все ожидания и набрал огромную массу!";
+  else if (gain > 10) msg = "Очень хорошо! 🚀 Цель перевыполнена, отличная работа!";
+  else if (gain >= 9.5) msg = "Идеально! 🎯 Цель в 10 кг выполнена, красавчик!";
+  else if (gain >= 5) msg = "Хороший результат! 📈 Ты стал сильнее и больше. Не 10 кг, но прогресс отличный!";
+  else if (gain > 0) msg = "Небольшой прогресс есть! 🐢 Главное не сдаваться, нужно поднажать на питание.";
+  else msg = "Вес остался прежним или упал. 🍽️ Но ты получил бесценный опыт и дисциплину!";
+
+  const hGain = h - 170;
+  if (hGain >= 5) msg += " И даже вырос до нужной отметки! 🦒";
+  else if (hGain > 0) msg += " Немного подрос, что тоже супер!";
+  else msg += " Рост остался прежним, зато ты точно стал шире!";
+  
+  return msg;
+};
+
 const formatTime = (seconds: number | null) => {
   if (seconds === null) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -31,7 +49,7 @@ type Exercise = { id: string; title: string; setsText: string; numSets: number; 
 type WorkoutDay = { dayName: string; focus: string; phaseName: string; monthNum: number; exercises: Exercise[]; };
 
 const START_DATE = new Date(2026, 9, 30); // Oct 30, 2026
-const END_DATE = new Date(2027, 9, 30); // Oct 30, 2027
+const END_DATE = new Date(2027, 9, 29); // Oct 29, 2027
 
 const getWorkoutData = (dateStr: string): WorkoutDay | null => {
   const date = parseDateSafe(dateStr);
@@ -184,6 +202,7 @@ export default function App() {
   const activeDay = parseDateSafe(currentDateStr).getDay();
   const isWorkoutDay = activeDay === 1 || activeDay === 3 || activeDay === 5;
   const isBeforeStart = parseDateSafe(currentDateStr) < START_DATE;
+  const isEndDayOrPast = parseDateSafe(currentDateStr) >= END_DATE;
   const workoutData = useMemo(() => getWorkoutData(currentDateStr), [currentDateStr]);
 
   // Track progress specific to today
@@ -197,6 +216,17 @@ export default function App() {
     } catch (e) {}
     return [];
   });
+
+  const [finalStats, setFinalStats] = useState<{ weight: string, height: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem('workout_final_stats');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return null;
+  });
+  
+  const [inputWeight, setInputWeight] = useState('');
+  const [inputHeight, setInputHeight] = useState('');
 
   // Track lifetime stats and session time
   const [stats, setStats] = useState(() => {
@@ -373,6 +403,40 @@ export default function App() {
         
         {view === 'home' && (
           <div className="px-5 py-10 flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-20">
+            {isEndDayOrPast && !finalStats && (
+              <div className={`fixed inset-0 z-50 ${theme.surface} overflow-y-auto animate-in fade-in zoom-in-95 duration-700 p-6 flex flex-col items-center justify-center`}>
+                <div className="max-w-sm w-full space-y-6 text-center">
+                  <h1 className={`text-4xl font-black ${theme.onSurface} leading-tight`}>День Х настал! 🎉</h1>
+                  <p className={`font-medium ${theme.onSurfaceVariant} text-lg`}>Прошел ровно год. 29 октября 2027.</p>
+                  <p className={`font-medium ${theme.onSurfaceVariant}`}>Пора подвести итоги. Введи свои новые параметры:</p>
+                  
+                  <div className="space-y-4 mt-8 text-left">
+                    <div>
+                      <label className={`block text-sm font-bold ${theme.onSurfaceVariant} mb-2`}>Твой текущий вес (кг)</label>
+                      <input type="number" value={inputWeight} onChange={e => setInputWeight(e.target.value)} className={`w-full p-4 rounded-[20px] bg-white border-2 ${theme.outline} text-xl font-bold`} placeholder="Например, 68" />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-bold ${theme.onSurfaceVariant} mb-2`}>Твой текущий рост (см)</label>
+                      <input type="number" value={inputHeight} onChange={e => setInputHeight(e.target.value)} className={`w-full p-4 rounded-[20px] bg-white border-2 ${theme.outline} text-xl font-bold`} placeholder="Например, 175" />
+                    </div>
+                  </div>
+                  
+                  <button 
+                    disabled={!inputWeight || !inputHeight}
+                    onClick={() => {
+                      if (inputWeight && inputHeight) {
+                        const newStats = { weight: inputWeight, height: inputHeight };
+                        setFinalStats(newStats);
+                        localStorage.setItem('workout_final_stats', JSON.stringify(newStats));
+                      }
+                    }}
+                    className={`w-full mt-6 py-5 ${theme.primaryContainer} ${theme.onPrimaryContainer} rounded-full font-bold text-lg active:scale-95 transition-all disabled:opacity-50`}
+                  >
+                    Узнать вердикт алгоритма
+                  </button>
+                </div>
+              </div>
+            )}
             <header className="mb-2 text-center flex flex-col items-center">
               <div className={`w-20 h-20 rounded-[32px] ${theme.primaryContainer} flex items-center justify-center mb-6`}>
                  <Flower2 className={`w-10 h-10 ${theme.onPrimaryContainer}`} />
@@ -381,7 +445,7 @@ export default function App() {
                 Проект "18 лет"
               </h1>
               <div className={`mt-4 font-medium ${theme.onSurfaceVariant} text-sm flex flex-col gap-1`}>
-                <span>🎯 Цель: 1 год (30 окт 2026 – 30 окт 2027)</span>
+                <span>🎯 Цель: 1 год (30 окт 2026 – 29 окт 2027)</span>
                 <span>🏋️ Инвентарь: Штанга 20кг, Гантели 2х10кг</span>
               </div>
             </header>
@@ -391,6 +455,30 @@ export default function App() {
                 <p className="font-medium">Ой... кажется, ты пропустил прошлую тренировку. Но ничего страшного, давай продолжим сегодня! 🌸</p>
               </div>
             )}
+
+            <div className={`p-6 rounded-[32px] ${theme.surfaceContainer} shadow-sm`}>
+              <h2 className={`text-sm uppercase tracking-wider font-bold ${theme.onSurfaceVariant} mb-4`}>Мои параметры и цель</h2>
+              <div className={`flex justify-between items-center ${theme.surface} p-4 rounded-[24px]`}>
+                <div>
+                  <div className={`text-[10px] uppercase ${theme.onSurfaceVariant} font-bold opacity-80`}>Старт</div>
+                  <div className={`text-lg font-black ${theme.onSurface}`}>57 кг <span className="opacity-50 text-sm font-medium">/ 170 см</span></div>
+                </div>
+                <div className={`text-xl ${theme.onSurfaceVariant} opacity-50`}>➔</div>
+                <div className="text-right">
+                  <div className={`text-[10px] uppercase ${theme.onSurfaceVariant} font-bold opacity-80`}>Цель</div>
+                  <div className="text-lg font-black text-[#85223b]">+10 кг <span className="opacity-50 text-sm font-medium">/ 175 см</span></div>
+                </div>
+              </div>
+              {finalStats && (
+                <div className="mt-4 bg-[#ffb3c6] text-[#4c0014] p-5 rounded-[24px]">
+                  <div className="text-[10px] uppercase font-bold opacity-80 mb-1">Итог года</div>
+                  <div className="text-xl font-black">{finalStats.weight} кг <span className="opacity-50 text-sm font-medium">/ {finalStats.height} см</span></div>
+                  <div className="mt-3 text-sm font-bold leading-tight">
+                    {getFinalMessage(Number(finalStats.weight), Number(finalStats.height))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className={`p-6 rounded-[32px] ${theme.surfaceContainer} shadow-sm`}>
               <h2 className={`text-sm uppercase tracking-wider font-bold ${theme.onSurfaceVariant} mb-5`}>Статистика</h2>
